@@ -74,6 +74,9 @@
         <ul class="copyright">
           <li>&copy; Elsa-MinhAnh</li><li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
         </ul>
+        <div class="random-wrapper">
+          <div class="image"><img id="rand-elsa" src="elsa/images/pic05-2.jpg" alt="Elsa img rand" width="347" /></div>
+        </div>
       </footer>
 
     </div>
@@ -86,6 +89,18 @@
     <script src="elsa/assets/js/breakpoints.min.js"></script>
     <script src="elsa/assets/js/util.js"></script>
     <script src="elsa/assets/js/main.js"></script>
+    <script type="text/javascript">
+        function randomItem(arrayList) {
+            return arrayList[Math.floor(Math.random() * arrayList.length)];
+        }
+
+        $(document).ready(function () {
+            var elsa = ['bg.jpg', 'bg2.jpg', 'pic01-2.jpg', 'pic02-2.jpg', 'pic03-2.jpg', 'pic04-2.jpg', 'pic05-2.jpg'];
+            var elsaImg = randomItem(elsa); //elsa[Math.floor(Math.random() * elsa.length)];
+            //$('#rand-elsa').css({'background-image': 'url(http://ducquoc.github.io/elsa/images/' + elsaImg + ')'});
+            $('#rand-elsa').attr({'src': 'elsa/images/' + elsaImg + '?size=347'});
+        });
+    </script>
 
   </body>
 </html>
