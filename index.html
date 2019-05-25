@@ -76,7 +76,7 @@
         </ul>
         <div class="random-wrapper">
           <div class="image"><img id="rand-elsa" src="elsa/images/pic05-2.jpg" alt="Elsa img rand" width="337" /></div>
-          <div id="rand-signature" style="color:dimgray">'I love you three thousand.' - Morgan Stark (Avengers: Endgame)</div>
+          <div id="rand-signature" style="color:dimgray">'The greatest gladiator match in the history of the world... God vs. Man..' - Lex Luthor (Batman v Superman: Dawn of justice)</div>
         </div>
       </footer>
 
@@ -99,16 +99,16 @@
             var signatures = [ "'We're going to be okay. You can rest now.' - Pepper Potts (Avengers: Endgame)",
                 "'No amount of money ever bought a second of time.' - Iron Man (Avengers: Endgame)",
                 "'I keep telling everybody they should move on and grow. Some do. But not us.' - Captain America (Avengers: Endgame)",
-                "'I love you three thousand.' - Morgan Stark (Avengers: Endgame)",
+                "'They’re Hulk fans. They don’t know Ant-Man. Nobody does.' - Ant Man (Avengers: Endgame)",
                 "'If we do this, how do we know it’s going to end any differently than it did before?' - Hulk (Avengers: Endgame)",
                 "'I love you tons.' - Iron Man (Avengers: Endgame)",
-                "'They’re Hulk fans. They don’t know Ant-Man. Nobody does.' - Ant Man (Avengers: Endgame)",
+                "'I love you three thousand.' - Morgan Stark (Avengers: Endgame)",
                 "'I was wondering if you have any tips for her.' - Bryan Mills (Taken)",
                 "'Yeah, I do. Tell her pick another career.' - Sheerah (Taken)",
                 "'Wake up! I need you to be focused!' - Bryan Mills (Taken)",
+                "'Now's not the time for dick measuring, Stuart!' - Bryan Mills (Taken)",
                 "'Mom said your job made you paranoid.' - Kim (Taken)",
                 "'Well, my job made me aware.' - Bryan Mills (Taken)",
-                "'Now's not the time for dick measuring, Stuart!' - Bryan Mills (Taken)",
                 "'...and think because we are tolerant that we are weak and helpless. Your arrogance offends me.' - Bryan Mills (Taken)",
                 "'The greatest gladiator match in the history of the world... God vs. Man..' - Lex Luthor (Batman v Superman: Dawn of justice)",
                 "'Just because something works doesn't mean it can't be improved.' - Shuri (Black Panther)",
@@ -116,11 +116,11 @@
             ];
             var randomQuote = randomItem(signatures);
             $('#rand-signature').html(randomQuote);//$('#rand-signature').val(randomQuote);
-            var elsa = ['bg.jpg', 'bg2.jpg', 'pic01-2.jpg', 'pic02-2.jpg', 'pic03-2.jpg', 'pic04-2.jpg', 'pic05-2.jpg',
-                'pic06.jpg', 'pic06-2.jpg'];
+            var elsa = ['bg.jpg', 'bg2.jpg', 'bg3.jpg', 'bg4.jpg',
+                'pic01-2.jpg', 'pic02-2.jpg', 'pic03-2.jpg', 'pic04-2.jpg', 'pic05-2.jpg', 'pic06.jpg', 'pic06-2.jpg',
+                'pic07.jpg', 'pic07-2.jpg', 'pic08.jpg'];
             var elsaImg = randomItem(elsa); //elsa[Math.floor(Math.random() * elsa.length)];
-            //$('#rand-elsa').css({'background-image': 'url(http://ducquoc.github.io/elsa/images/' + elsaImg + ')'});
-            $('#rand-elsa').attr({'src': 'elsa/images/' + elsaImg + '?size=426'});
+            $('#rand-elsa').attr({'src': 'elsa/images/' + elsaImg + '?size=426'}); //.css({'background-image': 'url(http://ducquoc.github.io/elsa/images/' + elsaImg + ')'});
         });
     </script>
 
