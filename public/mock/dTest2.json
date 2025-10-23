@@ -1,0 +1,19 @@
+{
+  "project": {
+    "title": "DataTest2",
+    "creator": "Duc Quoc"
+  },
+  "tabs": [
+    {
+      "title": "0: Introduction",
+      "description": "Simple app to visualize the content of a knowledge base in the RDF format - open source [here](https://github.com/MadsHolten/sparql-visualizer).\n\nThe frontend of the app is based on [Angular](https://angular.io/), [material design](https://material.angular.io/) and [D3](https://d3js.org/) and the default local triplestore is based on [rdfstore](https://github.com/antoniogarrote/rdfstore-js).\n### Resources\n*[Documentation](https://www.w3.org/TR/sparql11-query/)",
+      "textOnly": true
+    },
+    {
+      "title": "1: mygrahph1",
+      "query": "CONSTRUCT\nWHERE {\n\t?nodeA ?edge ?nodeB\n}",
+      "triples": "<P1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <Person> .\n<buyer_123> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <Person> .\n<buyer_123> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <Buyer> .\n<P1> <born> \"1956\"^^<http://www.w3.org/2001/XMLSchema#int> .\n<P1> <born> \"2000\"^^<http://www.w3.org/2001/XMLSchema#int> .\n<P2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <Person> .\n<P2> <born> \"1999\"^^<http://www.w3.org/2001/XMLSchema#int> .\n<P1> <name> \"Dung\" .\n<P1> <name> \"Tom Hanks\" .\n<buyer_123> <name> \"John Doe\" .\n<buyer_123> <age> \"30\"^^<http://www.w3.org/2001/XMLSchema#int> .\n<P2> <name> \"Hieu\" .\n<P2> <name> \"Robert Downey Jr.\" .\n<P2> <born> \"1965\"^^<http://www.w3.org/2001/XMLSchema#int> .",
+      "description": "http://localhost:8000/sparql/mygraph1"
+    }
+  ]
+}
