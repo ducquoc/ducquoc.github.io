@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASTEROID GARDEN</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #05070a; color: #e2e8f0;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  canvas {
+    display: block; border: 2px solid #334155;
+    box-shadow: 0 0 40px rgba(16,185,129,0.15), inset 0 0 40px rgba(16,185,129,0.05);
+    background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+    max-width: 100%; max-height: 90vh;
+  }
+  #hud {
+    position: absolute; top: 20px; left: 50%;
+    transform: translateX(-50%); display: flex; gap: 40px;
+    pointer-events: none; z-index: 10;
+  }
+  .hud-item { text-align: center; text-transform: uppercase; letter-spacing: 2px; }
+  .hud-label { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+  .hud-value { font-size: 24px; font-weight: bold; color: #10b981;
+    text-shadow: 0 0 10px rgba(16,185,129,0.6); }
+  .hud-value.lives { color: #ef4444; text-shadow: 0 0 10px rgba(239,68,68,0.6); }
+  .hud-value.high-score { color: #f59e0b; text-shadow: 0 0 10px rgba(245,158,11,0.6); }
+  #start-screen {
+    position: absolute; inset: 0; background: rgba(2,6,13,0.85);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(4px);
+  }
+  .title { font-size: 56px; font-weight: bold; color: #10b981; letter-spacing: 8px;
+    margin-bottom: 12px; text-shadow: 0 0 20px rgba(16,185,129,0.8); }
+  .subtitle { font-size: 18px; color: #94a3b8; letter-spacing: 4px; margin-bottom: 30px; }
+  .controls { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px;
+    max-width: 300px; margin-bottom: 30px; }
+  .control { padding: 10px 16px; border: 1px solid #334155; border-radius: 6px;
+    background: rgba(30,41,59,0.6); color: #cbd5e1; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px; }
+  .control kbd { color: #10b981; font-weight: bold; }
+  .press-start {
+    padding: 12px 32px; font-size: 18px; font-family: inherit; font-weight: bold;
+    color: #10b981; background: transparent; border: 2px solid #10b981;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 3px; transition: all 0.2s;
+    box-shadow: 0 0 15px rgba(16,185,129,0.3);
+  }
+  .press-start:hover { background: #10b981; color: #020617;
+    box-shadow: 0 0 25px rgba(16,185,129,0.7); }
+  #game-over {
+    position: absolute; inset: 0; background: rgba(2,6,13,0.9);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(6px);
+  }
+  #game-over.visible { display: flex; }
+  .game-over-title { font-size: 48px; color: #ef4444; margin-bottom: 16px;
+    text-shadow: 0 0 20px rgba(239,68,68,0.5); }
+  .final-score { font-size: 32px; margin-bottom: 8px; color: #e2e8f0; }
+  .final-high-score { font-size: 18px; color: #f59e0b; margin-bottom: 24px; }
+  .press-r {
+    padding: 12px 32px; font-size: 18px; font-family: inherit; font-weight: bold;
+    color: #ef4444; background: transparent; border: 2px solid #ef4444;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 3px; transition: all 0.2s;
+    box-shadow: 0 0 15px rgba(239,68,68,0.3);
+  }
+  .press-r:hover { background: #ef4444; color: #020617;
+    box-shadow: 0 0 25px rgba(239,68,68,0.7); }
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 30;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%,
+      rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.15)); background-size: 100% 4px;
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 31;
+    background: radial-gradient(circle at center, transparent 50%, rgba(0,0,0,0.6) 100%);
+  }
+</style>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="hud">
+    <div class="hud-item"><div class="hud-label">score</div><div class="hud-value" id="scoreDisplay">0</div></div>
+    <div class="hud-item"><div class="hud-label">lives</div><div class="hud-value lives" id="livesDisplay">3</div></div>
+    <div class="hud-item"><div class="hud-label">best</div><div class="hud-value high-score" id="highScoreDisplay">0</div></div>
+  </div>
+  <div id="start-screen">
+    <div class="title">ASTEROID GARDEN</div>
+    <div class="subtitle">Navigate the garden. Survive the drift.</div>
+    <div class="controls">
+      <div class="control">Move <kbd>ARROWS</kbd> / <kbd>WASD</kbd></div>
+      <div class="control">Thrust <kbd>UP</kbd> / <kbd>W</kbd></div>
+      <div class="control">Fire <kbd>SPACE</kbd></div>
+    </div>
+    <button class="press-start" id="startBtn">Start Game</button>
+  </div>
+  <div id="game-over">
+    <div class="game-over-title">Garden Overgrown</div>
+    <div class="final-score" id="finalScore">Score: 0</div>
+    <div class="final-high-score" id="finalHighScore">Best: 0</div>
+    <button class="press-r" id="restartBtn">Play Again (R)</button>
+  </div>
+<script>
+(function(){
+  'use strict';
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const livesDisplay = document.getElementById('livesDisplay');
+  const highScoreDisplay = document.getElementById('highScoreDisplay');
+  const startScreen = document.getElementById('start-screen');
+  const gameOverScreen = document.getElementById('game-over');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const finalScoreDisplay = document.getElementById('finalScore');
+  const finalHighScoreDisplay = document.getElementById('finalHighScore');
+  const SHIP_TURN_SPEED = 0.07;
+  const SHIP_THRUST = 0.15;
+  const SHIP_FRICTION = 0.985;
+  const SHIP_RADIUS = 14;
+  const SHIP_INVULNERABLE_FRAMES = 120;
+  const BULLET_SPEED = 9;
+  const BULLET_LIFE = 60;
+  const BULLET_COOLDOWN = 12;
+  const ASTEROID_SPAWN_MIN_DIST = 150;
+  const PARTICLE_LIFE = 40;
+  const SCORE_LARGE = 20;
+  const SCORE_MEDIUM = 50;
+  const SCORE_SMALL = 100;
+  let score = 0, lives = 3, highScore = 0;
+  let gameRunning = false, gameOver = false, frameCount = 0, screenShake = 0;
+  const keys = {};
+  window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+  try {
+    const stored = localStorage.getItem('asteroidGardenHighScore');
+    if (stored !== null) highScore = parseInt(stored, 10) || 0;
+  } catch (e) {}
+  function random(min, max) { return Math.random() * (max - min) + min; }
+  function dist(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function wrap(val, max) {
+    if (val < 0) return val + max;
+    if (val > max) return val - max;
+    return val;
+  }
+  class Ship {
+    constructor() { this.reset(); }
+    reset() {
+      this.x = canvas.width / 2; this.y = canvas.height / 2;
+      this.vx = 0; this.vy = 0; this.angle = -Math.PI / 2;
+      this.invulnerable = SHIP_INVULNERABLE_FRAMES;
+      this.thrusting = false; this.radius = SHIP_RADIUS;
+    }
+    update() {
+      if (keys['ArrowLeft'] || keys['KeyA']) this.angle -= SHIP_TURN_SPEED;
+      if (keys['ArrowRight'] || keys['KeyD']) this.angle += SHIP_TURN_SPEED;
+      this.thrusting = false;
+      if (keys['ArrowUp'] || keys['KeyW']) {
+        this.thrusting = true;
+        this.vx += Math.cos(this.angle) * SHIP_THRUST;
+        this.vy += Math.sin(this.angle) * SHIP_THRUST;
+      }
+      this.vx *= SHIP_FRICTION; this.vy *= SHIP_FRICTION;
+      this.x += this.vx; this.y += this.vy;
+      this.x = wrap(this.x, canvas.width); this.y = wrap(this.y, canvas.height);
+      if (this.invulnerable > 0) this.invulnerable--;
+    }
+    draw() {
+      if (this.invulnerable > 0 && frameCount % 4 < 2) return;
+      ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+      if (this.thrusting) {
+        const flicker = random(-3, 3);
+        ctx.beginPath(); ctx.moveTo(-12, flicker);
+        ctx.lineTo(-22 - Math.abs(flicker), 4);
+        ctx.lineTo(-22 - Math.abs(flicker), -4); ctx.closePath();
+        ctx.fillStyle = '#fbbf24'; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-10, 0);
+        ctx.lineTo(-16, 4); ctx.lineTo(-16, -4); ctx.closePath();
+        ctx.fillStyle = '#fef3c7'; ctx.fill();
+      }
+      ctx.beginPath(); ctx.moveTo(14, 0);
+      ctx.lineTo(-10, 8); ctx.lineTo(-6, 0); ctx.lineTo(-10, -8);
+      ctx.closePath();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(-8, 0, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#10b981'; ctx.fill();
+      ctx.restore();
+    }
+  }
+  class Bullet {
+    constructor(x, y, angle) {
+      this.x = x; this.y = y;
+      this.vx = Math.cos(angle) * BULLET_SPEED;
+      this.vy = Math.sin(angle) * BULLET_SPEED;
+      this.life = BULLET_LIFE; this.radius = 2;
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.x = wrap(this.x, canvas.width); this.y = wrap(this.y, canvas.height);
+      this.life--;
+    }
+    draw() {
+      ctx.fillStyle = '#60a5fa';
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  class Asteroid {
+    constructor(x, y, size, vx, vy) {
+      this.x = x; this.y = y; this.size = size;
+      this.vx = vx || random(-1.5, 1.5);
+      this.vy = vy || random(-1.5, 1.5);
+      this.radius = size === 0 ? 30 : size === 1 ? 18 : 10;
+      this.angle = 0; this.spin = random(-0.05, 0.05);
+      this.vertices = [];
+      const vertexCount = random(7, 11);
+      for (let i = 0; i < vertexCount; i++) {
+        const a = (i / vertexCount) * Math.PI * 2;
+        const r = random(0.7, 1.0);
+        this.vertices.push({ angle: a, radius: r });
+      }
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.x = wrap(this.x, canvas.width); this.y = wrap(this.y, canvas.height);
+      this.angle += this.spin;
+    }
+    draw() {
+      ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+      ctx.beginPath();
+      const first = this.vertices[0];
+      ctx.moveTo(Math.cos(first.angle) * this.radius * first.radius,
+                 Math.sin(first.angle) * this.radius * first.radius);
+      for (let i = 1; i < this.vertices.length; i++) {
+        const v = this.vertices[i];
+        ctx.lineTo(Math.cos(v.angle) * this.radius * v.radius,
+                   Math.sin(v.angle) * this.radius * v.radius);
+      }
+      ctx.closePath();
+      if (this.size === 0) ctx.strokeStyle = '#f472b6';
+      else if (this.size === 1) ctx.strokeStyle = '#60a5fa';
+      else ctx.strokeStyle = '#a78bfa';
+      ctx.lineWidth = 2; ctx.stroke();
+      ctx.restore();
+    }
+  }
+  class Particle {
+    constructor(x, y, color) {
+      this.x = x; this.y = y;
+      const angle = random(0, Math.PI * 2);
+      const speed = random(0.5, 4);
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.life = PARTICLE_LIFE; this.maxLife = PARTICLE_LIFE;
+      this.color = color; this.size = random(1, 3);
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vx *= 0.95; this.vy *= 0.95;
+      this.life--;
+    }
+    draw() {
+      const alpha = this.life / this.maxLife;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = this.color;
+      ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+      ctx.globalAlpha = 1;
+    }
+  }
+  let ship; let bullets = []; let asteroids = []; let particles = [];
+  function initGame() {
+    ship = new Ship(); bullets = []; asteroids = []; particles = [];
+    score = 0; lives = 3; gameOver = false; screenShake = 0; frameCount = 0;
+    updateHUD(); spawnAsteroids(4);
+  }
+  function spawnAsteroids(count, nearShip) {
+    for (let i = 0; i < count; i++) {
+      let x, y;
+      if (nearShip) { x = ship.x; y = ship.y; }
+      else {
+        let attempts = 0;
+        do { x = random(0, canvas.width); y = random(0, canvas.height); attempts++; }
+        while (dist(x, y, ship.x, ship.y) < ASTEROID_SPAWN_MIN_DIST && attempts < 50);
+      }
+      const size = Math.floor(random(0, 3));
+      asteroids.push(new Asteroid(x, y, size));
+    }
+  }
+  function splitAsteroid(asteroid) {
+    if (asteroid.size < 2) {
+      const newSize = asteroid.size + 1;
+      const angle1 = random(0, Math.PI * 2);
+      const angle2 = angle1 + Math.PI;
+      const speed = random(1, 2.5);
+      asteroids.push(new Asteroid(asteroid.x, asteroid.y, newSize,
+        Math.cos(angle1) * speed, Math.sin(angle1) * speed));
+      asteroids.push(new Asteroid(asteroid.x, asteroid.y, newSize,
+        Math.cos(angle2) * speed, Math.sin(angle2) * speed));
+    }
+  }
+  function createExplosion(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+      particles.push(new Particle(x, y, color));
+    }
+  }
+  function shipHit() {
+    if (ship.invulnerable > 0) return;
+    lives--; screenShake = 20;
+    createExplosion(ship.x, ship.y, '#ffffff', 15);
+    ship.reset(); updateHUD();
+    if (lives <= 0) endGame();
+  }
+  function endGame() {
+    gameOver = true; gameRunning = false;
+    try {
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('asteroidGardenHighScore', String(highScore));
+      }
+    } catch (e) {}
+    finalScoreDisplay.textContent = 'Score: ' + score;
+    finalHighScoreDisplay.textContent = 'Best: ' + highScore;
+    gameOverScreen.classList.add('visible');
+  }
+  function updateHUD() {
+    scoreDisplay.textContent = score;
+    livesDisplay.textContent = lives;
+    highScoreDisplay.textContent = highScore;
+  }
+  function startGame() {
+    startScreen.style.display = 'none';
+    gameOverScreen.classList.remove('visible');
+    initGame(); gameRunning = true;
+    requestAnimationFrame(loop);
+  }
+  startBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', startGame);
+  let shootCooldown = 0;
+  function loop() {
+    if (!gameRunning) return;
+    frameCount++;
+    if (keys['Space'] && shootCooldown <= 0) {
+      const bx = ship.x + Math.cos(ship.angle) * 16;
+      const by = ship.y + Math.sin(ship.angle) * 16;
+      bullets.push(new Bullet(bx, by, ship.angle));
+      shootCooldown = BULLET_COOLDOWN;
+      createExplosion(ship.x, ship.y, '#60a5fa', 3);
+    }
+    if (shootCooldown > 0) shootCooldown--;
+    if (gameOver && keys['KeyR']) {
+      startGame(); keys['KeyR'] = false;
+    }
+    ship.update();
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      bullets[i].update();
+      if (bullets[i].life <= 0) bullets.splice(i, 1);
+    }
+    for (let i = asteroids.length - 1; i >= 0; i--) {
+      asteroids[i].update();
+    }
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      for (let j = asteroids.length - 1; j >= 0; j--) {
+        const a = asteroids[j];
+        if (dist(b.x, b.y, a.x, a.y) < a.radius) {
+          bullets.splice(i, 1);
+          if (a.size === 0) score += SCORE_LARGE;
+          else if (a.size === 1) score += SCORE_MEDIUM;
+          else score += SCORE_SMALL;
+          updateHUD();
+          const color = a.size === 0 ? '#f472b6' : a.size === 1 ? '#60a5fa' : '#a78bfa';
+          createExplosion(a.x, a.y, color, a.size === 0 ? 12 : a.size === 1 ? 8 : 5);
+          splitAsteroid(a);
+          asteroids.splice(j, 1);
+          break;
+        }
+      }
+    }
+    if (ship.invulnerable <= 0) {
+      for (let i = 0; i < asteroids.length; i++) {
+        const a = asteroids[i];
+        if (dist(ship.x, ship.y, a.x, a.y) < a.radius + ship.radius) {
+          shipHit(); break;
+        }
+      }
+    }
+    if (frameCount % 600 === 0 && asteroids.length < 8) {
+      spawnAsteroids(1);
+    }
+    if (screenShake > 0) screenShake *= 0.9;
+    ctx.save();
+    if (screenShake > 0) {
+      ctx.translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
+    }
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.08)';
+    ctx.lineWidth = 1;
+    const gridSize = 40;
+    const offsetX = (frameCount * 0.5) % gridSize;
+    const offsetY = (frameCount * 0.3) % gridSize;
+    for (let x = -gridSize + offsetX; x < canvas.width; x += gridSize) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = -gridSize + offsetY; y < canvas.height; y += gridSize) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+    for (const p of particles) p.draw();
+    for (const b of bullets) b.draw();
+    for (const a of asteroids) a.draw();
+    ship.draw();
+    ctx.restore();
+    requestAnimationFrame(loop);
+  }
+  startScreen.style.display = 'flex';
+  gameOverScreen.classList.remove('visible');
+  updateHUD();
+})();
+</script>
+</body>
+</html>
