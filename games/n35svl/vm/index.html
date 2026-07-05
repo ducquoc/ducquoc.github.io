@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOID MINER</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #02020a; color: #e2e8f0;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  canvas {
+    display: block; border: 2px solid #1e293b;
+    box-shadow: 0 0 60px rgba(56,189,248,0.15), inset 0 0 60px rgba(0,0,0,0.9);
+    background: #050510; max-width: 100%; max-height: 90vh;
+    cursor: crosshair;
+  }
+  #hud {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 45px; pointer-events: none; z-index: 10;
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+  .hud-item { text-align: center; }
+  .hud-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+  .hud-value { font-size: 24px; font-weight: bold; text-shadow: 0 0 12px currentColor; }
+  .hud-value.hull { color: #f87171; }
+  .hud-value.minerals { color: #34d399; }
+  .hud-value.wave { color: #a78bfa; }
+  .hud-value.score { color: #fbbf24; }
+  .hud-value.best { color: #38bdf8; }
+  #upgrades-panel {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    width: 640px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    z-index: 10;
+  }
+  .upgrade-card {
+    background: rgba(15,23,42,0.85); border: 1px solid #334155;
+    border-radius: 10px; padding: 14px; text-align: center;
+    backdrop-filter: blur(6px); cursor: pointer; transition: all 0.15s;
+    user-select: none;
+  }
+  .upgrade-card:hover { border-color: #38bdf8; background: rgba(30,41,59,1); }
+  .upgrade-card.disabled { opacity: 0.5; border-color: #475569; cursor: not-allowed; }
+  .upgrade-card h3 { font-size: 13px; margin-bottom: 4px; color: #e2e8f0; text-transform: uppercase; letter-spacing: 1px; }
+  .upgrade-card .level { font-size: 11px; color: #94a3b8; margin-bottom: 6px; }
+  .upgrade-card .cost { font-size: 12px; color: #fbbf24; font-weight: bold; }
+  .upgrade-card .desc { font-size: 10px; color: #64748b; margin-top: 6px; line-height: 1.4; }
+  #start-screen {
+    position: absolute; inset: 0; background: radial-gradient(circle, #0f172a 0%, #02020a 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(8px);
+  }
+  .title { font-size: 60px; font-weight: bold; color: #38bdf8; letter-spacing: 8px;
+    margin-bottom: 10px; text-shadow: 0 0 30px rgba(56,189,248,0.8); }
+  .subtitle { font-size: 16px; color: #94a3b8; letter-spacing: 6px; margin-bottom: 40px;
+    text-shadow: 0 0 15px rgba(148,163,184,0.4); font-style: italic; }
+  .controls { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px;
+    max-width: 360px; margin-bottom: 40px; }
+  .control { padding: 10px 16px; border: 1px solid #334155; border-radius: 6px;
+    background: rgba(30,41,59,0.5); color: #cbd5e1; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px; }
+  .control kbd { color: #38bdf8; font-weight: bold; }
+  .press-start {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #38bdf8; background: transparent; border: 2px solid #38bdf8;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(56,189,248,0.4);
+  }
+  .press-start:hover { background: #38bdf8; color: #02020a;
+    box-shadow: 0 0 35px rgba(56,189,248,0.9); }
+  #game-over {
+    position: absolute; inset: 0; background: rgba(2,2,10,0.94);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(10px);
+  }
+  #game-over.visible { display: flex; }
+  .game-title { font-size: 52px; font-weight: bold; color: #f87171; margin-bottom: 16px;
+    text-shadow: 0 0 25px rgba(248,113,113,0.8); }
+  .final-stats { font-size: 20px; color: #e2e8f0; margin-bottom: 8px; }
+  .press-r {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #38bdf8; background: transparent; border: 2px solid #38bdf8;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(56,189,248,0.4);
+  }
+  .press-r:hover { background: #38bdf8; color: #02020a;
+    box-shadow: 0 0 35px rgba(56,189,248,0.9); }
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 30;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%,
+      rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.35)); background-size: 100% 4px;
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 31;
+    background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.85) 100%);
+  }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 25;
+    background: rgba(15,23,42,0.95); border: 1px solid #334155;
+    border-radius: 6px; padding: 8px 12px; font-size: 12px;
+    color: #e2e8f0; display: none; backdrop-filter: blur(4px);
+  }
+  .tooltip b { color: #38bdf8; }
+</style>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <canvas id="gameCanvas" width="1000" height="700"></canvas>
+  <div id="tooltip" class="tooltip"></div>
+  <div id="hud">
+    <div class="hud-item"><div class="hud-label">hull</div><div class="hud-value hull" id="hullDisplay">100</div></div>
+    <div class="hud-item"><div class="hud-label">minerals</div><div class="hud-value minerals" id="mineralsDisplay">0</div></div>
+    <div class="hud-item"><div class="hud-label">wave</div><div class="hud-value wave" id="waveDisplay">1</div></div>
+    <div class="hud-item"><div class="hud-label">score</div><div class="hud-value score" id="scoreDisplay">0</div></div>
+    <div class="hud-item"><div class="hud-label">best</div><div class="hud-value best" id="bestScoreDisplay">0</div></div>
+  </div>
+  <div id="upgrades-panel">
+    <div class="upgrade-card" id="cardHull">
+      <h3>Hull</h3><div class="level" id="lvlHull">L1</div>
+      <div class="cost" id="costHull">25</div><div class="desc">+50 max HP</div>
+    </div>
+    <div class="upgrade-card" id="cardWeapon">
+      <h3>Weapon</h3><div class="level" id="lvlWeapon">L1</div>
+      <div class="cost" id="costWeapon">30</div><div class="desc">+25% damage</div>
+    </div>
+    <div class="upgrade-card" id="cardEngine">
+      <h3>Engine</h3><div class="level" id="lvlEngine">L1</div>
+      <div class="cost" id="costEngine">35</div><div class="desc">+15% speed</div>
+    </div>
+    <div class="upgrade-card" id="cardCargo">
+      <h3>Cargo</h3><div class="level" id="lvlCargo">L1</div>
+      <div class="cost" id="costCargo">40</div><div class="desc">+2 carry</div>
+    </div>
+  </div>
+  <div id="start-screen">
+    <div class="title">VOID MINER</div>
+    <div class="subtitle">Mine the void. Survive the drones.</div>
+    <div class="controls">
+      <div class="control">Move <kbd>WASD</kbd></div>
+      <div class="control">Aim <kbd>MOUSE</kbd></div>
+      <div class="control">Mine <kbd>CLICK</kbd></div>
+    </div>
+    <button class="press-start" id="startBtn">Launch</button>
+  </div>
+  <div id="game-over">
+    <div class="game-title">Hull Breach</div>
+    <div class="final-stats" id="finalScore">Score: 0</div>
+    <div class="final-stats" id="finalWave">Wave reached: 1</div>
+    <div class="final-stats" id="finalBest">Best score: 0</div>
+    <button class="press-r" id="restartBtn">Restart (R)</button>
+  </div>
+<script>
+(function(){
+  'use strict';
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+
+  const hullDisplay = document.getElementById('hullDisplay');
+  const mineralsDisplay = document.getElementById('mineralsDisplay');
+  const waveDisplay = document.getElementById('waveDisplay');
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const bestScoreDisplay = document.getElementById('bestScoreDisplay');
+  const startScreen = document.getElementById('start-screen');
+  const gameOverScreen = document.getElementById('game-over');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const finalScore = document.getElementById('finalScore');
+  const finalWave = document.getElementById('finalWave');
+  const finalBest = document.getElementById('finalBest');
+
+  let bestScore = 0;
+  try {
+    const s = localStorage.getItem('voidMinerBestScore');
+    if (s !== null) bestScore = parseInt(s, 10) || 0;
+  } catch (e) {}
+  bestScoreDisplay.textContent = bestScore;
+
+  const mouse = { x: CW/2, y: CH/2, down: false, justClicked: false };
+  window.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  window.addEventListener('mousedown', () => { mouse.down = true; mouse.justClicked = true; });
+  window.addEventListener('mouseup', () => { mouse.down = false; });
+  window.addEventListener('click', () => { mouse.justClicked = false; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  const keys = {};
+  window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+  function random(min, max) { return Math.random() * (max - min) + min; }
+  function dist(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function angleTo(tx, ty, sx, sy) { return Math.atan2(ty - sy, tx - sx); }
+
+  // Upgrade definitions
+  const UPGRADES = {
+    hull:   { name: 'Hull',   baseCost: 25, costMult: 1.6, maxLevel: 20 },
+    weapon: { name: 'Weapon', baseCost: 30, costMult: 1.5, maxLevel: 20 },
+    engine: { name: 'Engine', baseCost: 35, costMult: 1.5, maxLevel: 20 },
+    cargo:  { name: 'Cargo',  baseCost: 40, costMult: 1.5, maxLevel: 15 },
+  };
+
+  class Ship {
+    constructor() { this.reset(); }
+    reset() {
+      this.x = CW / 2; this.y = CH / 2;
+      this.angle = 0;
+      this.vx = 0; this.vy = 0;
+      this.radius = 10;
+      this.levels = { hull: 1, weapon: 1, engine: 1, cargo: 1 };
+      this.maxHp = 100 + (this.levels.hull - 1) * 50;
+      this.hp = this.maxHp;
+      this.invulnerable = 0;
+      this.cooldown = 0;
+      this.dead = false;
+      this.cargo = 0;
+      this.cargoMax = 10;
+    }
+    get speed() { return 4.0 * (1 + (this.levels.engine - 1) * 0.15); }
+    get fireRate() { return Math.max(6, 18 - (this.levels.weapon - 1) * 1); }
+    get damage() { return 12 * (1 + (this.levels.weapon - 1) * 0.25); }
+    get cargoCap() { return 10 + (this.levels.cargo - 1) * 2; }
+    update() {
+      if (this.dead) return;
+      let dx = 0, dy = 0;
+      if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+      if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
+      if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+      if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+      const len = Math.sqrt(dx*dx + dy*dy);
+      if (len > 0) { dx /= len; dy /= len; }
+      this.vx = dx * this.speed; this.vy = dy * this.speed;
+      this.x += this.vx; this.y += this.vy;
+      this.x = clamp(this.x, 16, CW - 16); this.y = clamp(this.y, 16, CH - 16);
+      this.angle = angleTo(mouse.x, mouse.y, this.x, this.y);
+      if (this.invulnerable > 0) this.invulnerable--;
+      if (this.cooldown > 0) this.cooldown--;
+    }
+    draw() {
+      if (this.dead) return;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.angle);
+      const flash = this.invulnerable > 0 && frameCount % 6 < 3;
+      if (flash) ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#38bdf8'; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(14, 0); ctx.lineTo(-10, -9); ctx.lineTo(-6, 0); ctx.lineTo(-10, 9); ctx.closePath();
+      ctx.stroke();
+      ctx.fillStyle = '#38bdf8'; ctx.globalAlpha = 0.25; ctx.fill();
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+      // Mining laser indicator (aim line)
+      ctx.strokeStyle = 'rgba(56,189,248,0.35)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(this.angle) * 120, Math.sin(this.angle) * 120); ctx.stroke();
+      // Cargo indicator
+      ctx.fillStyle = '#34d399';
+      ctx.fillRect(-7, -16, 14 * (this.cargo / this.cargoCap), 3);
+      ctx.restore();
+      this.drawHullBar();
+    }
+    drawHullBar() {
+      const bw = 36, bh = 4;
+      const x = this.x - bw/2, y = this.y - 20;
+      ctx.fillStyle = '#111'; ctx.fillRect(x, y, bw, bh);
+      ctx.fillStyle = this.hp > 30 ? '#10b981' : '#f87171';
+      ctx.fillRect(x, y, bw * (this.hp / this.maxHp), bh);
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.strokeRect(x, y, bw, bh);
+    }
+  }
+
+  class Asteroid {
+    constructor(wave) {
+      this.radius = random(14, 26) + wave * 1.5;
+      this.hp = 20 + wave * 10;
+      this.maxHp = this.hp;
+      this.minerals = Math.floor(5 + wave * 2);
+      this.speed = random(0.4, 1.0) + wave * 0.03;
+      const ang = random(0, Math.PI * 2);
+      const side = Math.floor(random(0, 4));
+      const margin = 60;
+      if (side === 0) { this.x = random(-margin, CW + margin); this.y = random(-margin, -margin); }
+      else if (side === 1) { this.x = random(CW + margin, CW + margin * 2); this.y = random(0, CH); }
+      else if (side === 2) { this.x = random(-margin, CW + margin); this.y = random(CH + margin, CH + margin * 2); }
+      else { this.x = random(-margin, -margin); this.y = random(0, CH); }
+      this.angle = angleTo(CW / 2, CH / 2, this.x, this.y);
+      this.dead = false;
+      this.spin = random(-0.04, 0.04);
+      this.rot = 0;
+      this.color = '#94a3b8';
+    }
+    update() {
+      if (this.dead) return;
+      this.rot += this.spin;
+      this.x += Math.cos(this.angle) * this.speed;
+      this.y += Math.sin(this.angle) * this.speed;
+      this.x = (this.x + CW) % CW; this.y = (this.y + CH) % CH;
+    }
+    takeDamage(amount) {
+      this.hp -= amount;
+      if (this.hp <= 0 && !this.dead) {
+        this.dead = true;
+        return true;
+      }
+      return false;
+    }
+    draw() {
+      if (this.dead) return;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rot);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 8;
+      ctx.beginPath();
+      const verts = 8;
+      for (let i = 0; i <= verts; i++) {
+        const a = (i / verts) * Math.PI * 2;
+        const r = this.radius * random(0.75, 1.0);
+        if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+        else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.closePath(); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  }
+
+  class Mineral {
+    constructor(x, y, amount) {
+      this.x = x; this.y = y; this.amount = amount;
+      this.life = 600; this.bob = 0;
+      const ang = random(0, Math.PI * 2);
+      this.vx = Math.cos(ang) * 0.8; this.vy = Math.sin(ang) * 0.8;
+      this.collected = false;
+    }
+    update() {
+      if (this.collected) return;
+      this.x += this.vx; this.y += this.vy;
+      this.x = clamp(this.x, 0, CW); this.y = clamp(this.y, 0, CH);
+      this.bob += 0.15;
+      this.life--;
+      if (this.life <= 0) this.collected = true;
+    }
+    draw() {
+      if (this.collected) return;
+      ctx.save();
+      ctx.translate(this.x, this.y + Math.sin(this.bob) * 4);
+      ctx.fillStyle = '#34d399'; ctx.shadowColor = '#34d399'; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  }
+
+  class Projectile {
+    constructor(x, y, angle, damage, color, speed) {
+      this.x = x; this.y = y; this.angle = angle;
+      this.damage = damage; this.color = color; this.speed = speed;
+      this.life = 45; this.radius = 3;
+      this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed;
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.life--;
+    }
+    draw() {
+      ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  class Drone {
+    constructor(wave) {
+      this.radius = 11;
+      this.hp = 25 + wave * 12;
+      this.maxHp = this.hp;
+      this.speed = 1.8 + wave * 0.08;
+      this.damage = 15 + wave * 2;
+      this.dead = false;
+      this.hitFlash = 0;
+      const side = Math.floor(random(0, 4));
+      const margin = 60;
+      if (side === 0) { this.x = random(-margin, CW + margin); this.y = random(-margin, -margin); }
+      else if (side === 1) { this.x = random(CW + margin, CW + margin * 2); this.y = random(0, CH); }
+      else if (side === 2) { this.x = random(-margin, CW + margin); this.y = random(CH + margin, CH + margin * 2); }
+      else { this.x = random(-margin, -margin); this.y = random(0, CH); }
+      this.shootTimer = random(60, 120);
+    }
+    update(ship) {
+      if (this.dead) return;
+      if (this.hitFlash > 0) this.hitFlash--;
+      const ang = angleTo(ship.x, ship.y, this.x, this.y);
+      this.x += Math.cos(ang) * this.speed;
+      this.y += Math.sin(ang) * this.speed;
+      this.shootTimer--;
+      if (this.shootTimer <= 0 && dist(this.x, this.y, ship.x, ship.y) < 400) {
+        this.shootTimer = random(70, 140);
+        return { shoot: true, angle: ang };
+      }
+      if (dist(this.x, this.y, ship.x, ship.y) < this.radius + ship.radius && ship.invulnerable <= 0) {
+        ship.hp -= this.damage;
+        ship.invulnerable = 60;
+        screenShake = 10;
+        createExplosion(ship.x, ship.y, '#f87171', 6, 20);
+        if (ship.hp <= 0) ship.dead = true;
+      }
+      return null;
+    }
+    takeDamage(amount) {
+      this.hp -= amount;
+      this.hitFlash = 6;
+      if (this.hp <= 0 && !this.dead) {
+        this.dead = true;
+        return true;
+      }
+      return false;
+    }
+    draw() {
+      if (this.dead) return;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.fillStyle = this.hitFlash > 0 ? '#fbbf24' : '#f87171';
+      ctx.shadowColor = '#f87171'; ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(0, -this.radius);
+      ctx.lineTo(this.radius * 0.866, this.radius * 0.5);
+      ctx.lineTo(0, -this.radius * 0.2);
+      ctx.lineTo(-this.radius * 0.866, this.radius * 0.5);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  }
+
+  class Particle {
+    constructor(x, y, color) {
+      this.x = x; this.y = y; this.color = color;
+      const ang = random(0, Math.PI * 2);
+      const sp = random(1, 6);
+      this.vx = Math.cos(ang) * sp; this.vy = Math.sin(ang) * sp;
+      this.life = random(20, 40); this.maxLife = this.life;
+      this.size = random(2, 5);
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vx *= 0.92; this.vy *= 0.92;
+      this.life--;
+    }
+    draw() {
+      const a = this.life / this.maxLife;
+      ctx.globalAlpha = a; ctx.fillStyle = this.color;
+      ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  let ship;
+  let asteroids = [];
+  let mineralsArr = [];
+  let projectiles = [];
+  let drones = [];
+  let particles = [];
+  let explosions = [];
+  let wave = 1;
+  let score = 0;
+  let minerals = 0;
+  let gameRunning = false;
+  let gameOver = false;
+  let frameCount = 0;
+  let spawnTimer = 0;
+  let asteroidsToSpawn = 0;
+  let waveActive = false;
+  let waveStartDelay = 60;
+  let droneTimer = 0;
+  let screenShake = 0;
+  let upgradePanelOpen = false;
+
+  function updateHUD() {
+    hullDisplay.textContent = Math.ceil(ship.hp) + '/' + ship.maxHp;
+    mineralsDisplay.textContent = minerals;
+    waveDisplay.textContent = wave;
+    scoreDisplay.textContent = score;
+    bestScoreDisplay.textContent = bestScore;
+    // Update upgrade cards
+    const cards = {
+      hull: { lvl: 'lvlHull', cost: 'costHull' },
+      weapon: { lvl: 'lvlWeapon', cost: 'costWeapon' },
+      engine: { lvl: 'lvlEngine', cost: 'costEngine' },
+      cargo: { lvl: 'lvlCargo', cost: 'costCargo' },
+    };
+    for (const [key, ids] of Object.entries(cards)) {
+      const lvl = ship.levels[key];
+      const cost = Math.floor(UPGRADES[key].baseCost * Math.pow(UPGRADES[key].costMult, lvl - 1));
+      const maxed = lvl >= UPGRADES[key].maxLevel;
+      document.getElementById(ids.lvl).textContent = maxed ? 'MAX' : 'L' + lvl;
+      document.getElementById(ids.cost).textContent = maxed ? 'MAX' : cost;
+      const card = document.getElementById('card' + key.charAt(0).toUpperCase() + key.slice(1));
+      if (maxed || minerals < cost) card.classList.add('disabled');
+      else card.classList.remove('disabled');
+    }
+  }
+
+  function addScore(amount) {
+    score += amount;
+    if (score > bestScore) {
+      bestScore = score;
+      try { localStorage.setItem('voidMinerBestScore', String(bestScore)); } catch (e) {}
+    }
+    updateHUD();
+  }
+
+  function createExplosion(x, y, color, count, speed) {
+    for (let i = 0; i < count; i++) explosions.push({ x, y, color, vx: (random(0,1)-0.5)*speed*2, vy: (random(0,1)-0.5)*speed*2, life: random(15,30), size: random(2,5) });
+  }
+
+  function initGame() {
+    ship = new Ship();
+    asteroids = []; mineralsArr = []; projectiles = []; drones = []; particles = []; explosions = [];
+    wave = 1; score = 0; minerals = 0;
+    gameOver = false; frameCount = 0; spawnTimer = 0;
+    asteroidsToSpawn = 0; waveActive = false; waveStartDelay = 60; droneTimer = 0; screenShake = 0;
+    updateHUD();
+    startWave(1);
+  }
+
+  function startWave(w) {
+    wave = w; waveActive = true;
+    asteroidsToSpawn = 5 + w * 4;
+    waveStartDelay = 0;
+    droneTimer = random(120, 200);
+    updateHUD();
+  }
+
+  function spawnAsteroid() {
+    if (asteroidsToSpawn <= 0) return;
+    asteroids.push(new Asteroid(wave));
+    asteroidsToSpawn--;
+    spawnTimer = random(20, 50) / (1 + wave * 0.04);
+  }
+
+  function endGame() {
+    gameOver = true;
+    gameRunning = false;
+    if (score > bestScore) {
+      bestScore = score;
+      try { localStorage.setItem('voidMinerBestScore', String(bestScore)); } catch (e) {}
+    }
+    finalScore.textContent = 'Score: ' + score;
+    finalWave.textContent = 'Wave reached: ' + wave;
+    finalBest.textContent = 'Best score: ' + bestScore;
+    gameOverScreen.classList.add('visible');
+    updateHUD();
+  }
+
+  function startGame() {
+    startScreen.style.display = 'none';
+    gameOverScreen.classList.remove('visible');
+    initGame();
+    gameRunning = true;
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', startGame);
+
+  // Upgrade card clicks
+  const upgradeActions = {
+    hull: () => buyUpgrade('hull'),
+    weapon: () => buyUpgrade('weapon'),
+    engine: () => buyUpgrade('engine'),
+    cargo: () => buyUpgrade('cargo'),
+  };
+  for (const key of Object.keys(UPGRADES)) {
+    document.getElementById('card' + key.charAt(0).toUpperCase() + key.slice(1)).addEventListener('click', upgradeActions[key]);
+  }
+
+  function buyUpgrade(key) {
+    const lvl = ship.levels[key];
+    if (lvl >= UPGRADES[key].maxLevel) return;
+    const cost = Math.floor(UPGRADES[key].baseCost * Math.pow(UPGRADES[key].costMult, lvl - 1));
+    if (minerals < cost) return;
+    minerals -= cost;
+    ship.levels[key]++;
+    if (key === 'hull') { ship.maxHp = 100 + (ship.levels.hull - 1) * 50; ship.hp = Math.min(ship.hp + 50, ship.maxHp); }
+    if (key === 'cargo') { ship.cargoMax = ship.cargoCap; ship.cargo = Math.min(ship.cargo, ship.cargoMax); }
+    updateHUD();
+  }
+  let shootCooldown = 0;
+  function loop() {
+    if (!gameRunning) return;
+    frameCount++;
+
+    if (keys['KeyR']) { startGame(); keys['KeyR'] = false; return; }
+
+    ship.update();
+
+    // Mining laser - continuous fire while holding click
+    if (mouse.down && ship.cooldown <= 0 && !ship.dead) {
+      const angle = ship.angle;
+      const bx = ship.x + Math.cos(angle) * 18;
+      const by = ship.y + Math.sin(angle) * 18;
+      projectiles.push(new Projectile(bx, by, angle, ship.damage, '#38bdf8', 16));
+      ship.cooldown = ship.fireRate;
+      screenShake = 2;
+      for (let i = 0; i < 2; i++) particles.push(new Particle(bx, by, '#38bdf8'));
+    }
+
+    // Update projectiles
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      projectiles[i].update();
+      if (projectiles[i].life <= 0 || projectiles[i].x < 0 || projectiles[i].x > CW ||
+          projectiles[i].y < 0 || projectiles[i].y > CH) {
+        projectiles.splice(i, 1); continue;
+      }
+      // Hit asteroids
+      for (let a = asteroids.length - 1; a >= 0; a--) {
+        const ast = asteroids[a];
+        if (ast.dead) continue;
+        if (dist(projectiles[i].x, projectiles[i].y, ast.x, ast.y) < ast.radius + 3) {
+          if (ast.takeDamage(projectiles[i].damage)) {
+            minerals += ast.minerals;
+            score += Math.floor(ast.minerals * 2);
+            createExplosion(ast.x, ast.y, ast.color, 8, 25);
+            for (let m = 0; m < Math.floor(ast.minerals / 2) + 1; m++) {
+              mineralsArr.push(new Mineral(ast.x, ast.y, 1));
+            }
+            asteroids.splice(a, 1);
+          }
+          projectiles.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    // Wave spawning
+    if (waveStartDelay > 0) {
+      waveStartDelay--;
+      if (waveStartDelay <= 0) startWave(wave);
+    }
+
+    if (waveActive) {
+      if (asteroidsToSpawn > 0 && spawnTimer <= 0) {
+        spawnAsteroid();
+      }
+      if (spawnTimer > 0) spawnTimer--;
+      if (asteroidsToSpawn <= 0 && asteroids.every(a => a.dead)) {
+        waveActive = false;
+        minerals += 20 + wave * 5;
+        score += 100 + wave * 25;
+        updateHUD();
+        waveStartDelay = 150;
+        setTimeout(() => { if (gameRunning && !gameOver) startWave(wave + 1); }, 1600);
+      }
+    }
+
+    // Update asteroids
+    for (let i = asteroids.length - 1; i >= 0; i--) {
+      asteroids[i].update();
+    }
+
+    // Update minerals
+    for (let i = mineralsArr.length - 1; i >= 0; i--) {
+      const m = mineralsArr[i];
+      m.update();
+      if (m.collected) { mineralsArr.splice(i, 1); continue; }
+      if (dist(m.x, m.y, ship.x, ship.y) < ship.radius + 6 && ship.cargo < ship.cargoCap) {
+        ship.cargo++;
+        minerals += 1;
+        mineralsArr.splice(i, 1);
+        updateHUD();
+      }
+    }
+
+    // Drones
+    droneTimer--;
+    if (droneTimer <= 0 && waveActive) {
+      drones.push(new Drone(wave));
+      droneTimer = random(150, 260) / (1 + wave * 0.05);
+    }
+
+    for (let i = drones.length - 1; i >= 0; i--) {
+      const d = drones[i];
+      const res = d.update(ship);
+      if (res && res.shoot) {
+        projectiles.push(new Projectile(d.x, d.y, res.angle, d.damage * 0.5, '#f87171', 9));
+      }
+      if (d.dead) {
+        score += 150 + wave * 20;
+        createExplosion(d.x, d.y, '#f87171', 10, 30);
+        drones.splice(i, 1);
+      }
+    }
+
+    // Projectiles hit drones (player projectiles vs drones)
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      const p = projectiles[i];
+      for (let d = drones.length - 1; d >= 0; d--) {
+        const drone = drones[d];
+        if (drone.dead) continue;
+        if (dist(p.x, p.y, drone.x, drone.y) < drone.radius + 3) {
+          if (drone.takeDamage(p.damage)) projectiles.splice(i, 1);
+          else projectiles.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    // Explosions
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      const e = explosions[i];
+      e.x += e.vx; e.y += e.vy;
+      e.vx *= 0.9; e.vy *= 0.9;
+      e.life--;
+      if (e.life <= 0) explosions.splice(i, 1);
+    }
+
+    if (screenShake > 0) screenShake *= 0.9;
+
+    // Game over check
+    if (ship.dead) {
+      endGame();
+      return;
+    }
+
+    // Draw
+    ctx.save();
+    if (screenShake > 0) {
+      ctx.translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
+    }
+
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Starfield
+    ctx.fillStyle = '#e2e8f0';
+    for (let i = 0; i < 60; i++) {
+      const sx = (frameCount * 0.1 + i * 97) % CW;
+      const sy = (i * 131) % CH;
+      const sz = ((i * 53) % 3) + 1;
+      ctx.globalAlpha = 0.4 + 0.6 * ((i % 3) / 3);
+      ctx.fillRect(sx, sy, sz, sz);
+    }
+    ctx.globalAlpha = 1;
+
+    // Draw minerals
+    for (const m of mineralsArr) m.draw();
+    // Draw asteroids
+    for (const a of asteroids) a.draw();
+    // Draw drones
+    for (const d of drones) d.draw();
+    // Draw projectiles
+    for (const p of projectiles) p.draw();
+    // Draw ship
+    ship.draw();
+    // Draw explosions
+    for (const e of explosions) {
+      ctx.globalAlpha = e.life / 30;
+      ctx.strokeStyle = e.color; ctx.lineWidth = 2; ctx.shadowColor = e.color; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.size * (30 - e.life) / 10, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+
+    updateHUD();
+    requestAnimationFrame(loop);
+  }
+
+  startScreen.style.display = 'flex';
+  gameOverScreen.classList.remove('visible');
+  updateHUD();
+
+})();
+</script>
+</body>
+</html>
