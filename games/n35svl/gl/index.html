@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRAVITY LAB</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f172a; color: #e2e8f0;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  canvas {
+    display: block; border: 2px solid #334155;
+    box-shadow: 0 0 60px rgba(99,102,241,0.15), inset 0 0 60px rgba(0,0,0,0.9);
+    background: linear-gradient(#1e1b4b, #312e81); max-width: 100%; max-height: 90vh;
+    cursor: crosshair;
+  }
+  #hud {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 55px; pointer-events: none; z-index: 10;
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+  .hud-item { text-align: center; }
+  .hud-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+  .hud-value { font-size: 24px; font-weight: bold; text-shadow: 0 0 12px currentColor; }
+  .hud-value.energy { color: #38bdf8; }
+  .hud-value.level { color: #a78bfa; }
+  .hud-value.timer { color: #fbbf24; }
+  .hud-value.best { color: #34d399; }
+  #start-screen {
+    position: absolute; inset: 0; background: radial-gradient(circle, #1e1b4b 0%, #0f172a 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(8px);
+  }
+  .title { font-size: 60px; font-weight: bold; color: #a78bfa; letter-spacing: 10px;
+    margin-bottom: 10px; text-shadow: 0 0 30px rgba(167,139,250,0.8); }
+  .subtitle { font-size: 16px; color: #94a3b8; letter-spacing: 6px; margin-bottom: 40px;
+    text-shadow: 0 0 15px rgba(148,163,184,0.4); font-style: italic; }
+  .controls { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px;
+    max-width: 360px; margin-bottom: 40px; }
+  .control { padding: 10px 16px; border: 1px solid #334155; border-radius: 6px;
+    background: rgba(30,41,59,0.5); color: #cbd5e1; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px; }
+  .control kbd { color: #a78bfa; font-weight: bold; }
+  .press-start {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #a78bfa; background: transparent; border: 2px solid #a78bfa;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(167,139,250,0.4);
+  }
+  .press-start:hover { background: #a78bfa; color: #0f172a;
+    box-shadow: 0 0 35px rgba(167,139,250,0.9); }
+  #game-over {
+    position: absolute; inset: 0; background: rgba(15,23,42,0.94);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(10px);
+  }
+  #game-over.visible { display: flex; }
+  .game-title { font-size: 52px; font-weight: bold; color: #f87171; margin-bottom: 16px;
+    text-shadow: 0 0 25px rgba(248,113,113,0.8); }
+  .final-stats { font-size: 20px; color: #e2e8f0; margin-bottom: 8px; }
+  .press-r {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #a78bfa; background: transparent; border: 2px solid #a78bfa;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(167,139,250,0.4);
+  }
+  .press-r:hover { background: #a78bfa; color: #0f172a;
+    box-shadow: 0 0 35px rgba(167,139,250,0.9); }
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 30;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%,
+      rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.35)); background-size: 100% 4px;
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 31;
+    background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.85) 100%);
+  }
+</style>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <canvas id="gameCanvas" width="1000" height="700"></canvas>
+  <div id="hud">
+    <div class="hud-item"><div class="hud-label">energy</div><div class="hud-value energy" id="energyDisplay">100</div></div>
+    <div class="hud-item"><div class="hud-label">level</div><div class="hud-value level" id="levelDisplay">1</div></div>
+    <div class="hud-item"><div class="hud-label">time</div><div class="hud-value timer" id="timerDisplay">0:00</div></div>
+    <div class="hud-item"><div class="hud-label">best</div><div class="hud-value best" id="bestTimeDisplay">0:00</div></div>
+  </div>
+  <div id="start-screen">
+    <div class="title">GRAVITY LAB</div>
+    <div class="subtitle">Bend gravity. Solve the puzzle. Escape.</div>
+    <div class="controls">
+      <div class="control">Move <kbd>A/D</kbd></div>
+      <div class="control">Jump <kbd>SPACE</kbd></div>
+      <div class="control">Gravity Well <kbd>CLICK</kbd></div>
+    </div>
+    <button class="press-start" id="startBtn">Enter Lab</button>
+  </div>
+  <div id="game-over">
+    <div class="game-title">System Failure</div>
+    <div class="final-stats" id="finalScore">Level: 1</div>
+    <div class="final-stats" id="finalTime">Time: 0:00</div>
+    <div class="final-stats" id="finalBest">Best time: 0:00</div>
+    <button class="press-r" id="restartBtn">Restart (R)</button>
+  </div>
+<script>
+(function(){
+  'use strict';
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+
+  const energyDisplay = document.getElementById('energyDisplay');
+  const levelDisplay = document.getElementById('levelDisplay');
+  const timerDisplay = document.getElementById('timerDisplay');
+  const bestTimeDisplay = document.getElementById('bestTimeDisplay');
+  const startScreen = document.getElementById('start-screen');
+  const gameOverScreen = document.getElementById('game-over');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const finalScore = document.getElementById('finalScore');
+  const finalTime = document.getElementById('finalTime');
+  const finalBest = document.getElementById('finalBest');
+
+  let bestTimes = {};
+  try {
+    const s = localStorage.getItem('gravityLabBestTimes');
+    if (s !== null) bestTimes = JSON.parse(s);
+  } catch (e) {}
+  function getBest(lvl) { return bestTimes[lvl] || 0; }
+  function setBest(lvl, t) { bestTimes[lvl] = t; try { localStorage.setItem('gravityLabBestTimes', JSON.stringify(bestTimes)); } catch (e) {} }
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  const mouse = { x: 0, y: 0, down: false, justClicked: false };
+  window.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  window.addEventListener('mousedown', () => { mouse.down = true; mouse.justClicked = true; });
+  window.addEventListener('mouseup', () => { mouse.down = false; });
+  window.addEventListener('click', () => { mouse.justClicked = false; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  const keys = {};
+  window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+  function random(min, max) { return Math.random() * (max - min) + min; }
+  function dist(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  const GRAVITY = 0.5;
+  const FRICTION = 0.96;
+
+  class Player {
+    constructor() { this.reset(); }
+    reset() {
+      this.x = 100; this.y = 100;
+      this.vx = 0; this.vy = 0;
+      this.radius = 12;
+      this.hp = 100;
+      this.dead = false;
+      this.invulnerable = 0;
+      this.energy = 100;
+      this.maxEnergy = 100;
+      this.cooldown = 0;
+      this.onGround = false;
+    }
+    update(platforms) {
+      if (this.dead) return;
+      let ax = 0, ay = 0;
+      if (keys['KeyA'] || keys['ArrowLeft']) ax -= 0.6;
+      if (keys['KeyD'] || keys['ArrowRight']) ax += 0.6;
+      if ((keys['KeyW'] || keys['Key'] || keys['ArrowUp'] || keys['Space']) && this.onGround) {
+        this.vy = -11;
+        this.onGround = false;
+      }
+      ay += GRAVITY;
+      this.vx += ax; this.vy += ay;
+      this.vx *= FRICTION; this.vy *= FRICTION;
+      this.x += this.vx; this.y += this.vy;
+      this.onGround = false;
+      // Platform collision
+      for (const p of platforms) {
+        if (this.x > p.x - this.radius && this.x < p.x + p.w + this.radius &&
+            this.y > p.y - this.radius && this.y < p.y + p.h + this.radius) {
+          // Simple AABB resolution
+          if (this.vy > 0 && this.y < p.y) {
+            this.y = p.y - this.radius;
+            this.vy = 0;
+            this.onGround = true;
+          } else if (this.vy < 0 && this.y > p.y + p.h) {
+            this.y = p.y + p.h + this.radius;
+            this.vy = 0;
+          }
+          if (this.vx > 0 && this.x < p.x) {
+            this.x = p.x - this.radius;
+            this.vx = 0;
+          } else if (this.vx < 0 && this.x > p.x + p.w) {
+            this.x = p.x + p.w + this.radius;
+            this.vx = 0;
+          }
+        }
+      }
+      // Screen bounds
+      if (this.x < 0) { this.x = 0; this.vx = 0; }
+      if (this.x > CW) { this.x = CW; this.vx = 0; }
+      if (this.y > CH) { this.die(); }
+      if (this.cooldown > 0) this.cooldown--;
+      if (this.invulnerable > 0) this.invulnerable--;
+    }
+    draw() {
+      if (this.dead) return;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.fillStyle = '#38bdf8'; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(0, -this.radius);
+      ctx.lineTo(this.radius * 0.866, this.radius * 0.5);
+      ctx.lineTo(0, -this.radius * 0.2);
+      ctx.lineTo(-this.radius * 0.866, this.radius * 0.5);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+    die() {
+      this.dead = true;
+    }
+  }
+
+  class Platform {
+    constructor(x, y, w, h) { this.x = x; this.y = y; this.w = w; this.h = h; }
+    draw() {
+      ctx.fillStyle = '#475569'; ctx.shadowColor = '#000'; ctx.shadowBlur = 8;
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+      ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2; ctx.strokeRect(this.x, this.y, this.w, this.h);
+      ctx.shadowBlur = 0;
+    }
+  }
+  class Crate {
+    constructor(x, y) { this.x = x; this.y = y; this.w = 30; this.h = 30; this.vx = 0; this.vy = 0; }
+    update(platforms) {
+      this.vy += GRAVITY * 0.7;
+      this.vx *= FRICTION; this.vy *= FRICTION;
+      this.x += this.vx; this.y += this.vy;
+      for (const p of platforms) {
+        if (this.x < p.x + p.w && this.x + this.w > p.x &&
+            this.y < p.y + p.h && this.y + this.h > p.y) {
+          if (this.vy > 0 && this.y < p.y) {
+            this.y = p.y - this.h;
+            this.vy = 0;
+          }
+          if (this.vx > 0 && this.x < p.x) {
+            this.x = p.x - this.w;
+            this.vx *= -0.3;
+          } else if (this.vx < 0 && this.x + this.w > p.x + p.w) {
+            this.x = p.x + p.w;
+            this.vx *= -0.3;
+          }
+        }
+      }
+      if (this.y > CH) { this.x = -100; this.y = -100; }
+    }
+    draw() {
+      ctx.fillStyle = '#94a3b8'; ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+      ctx.strokeStyle = '#475569'; ctx.lineWidth = 2; ctx.strokeRect(this.x, this.y, this.w, this.h);
+      ctx.shadowBlur = 0;
+    }
+  }
+  class Hazard {
+    constructor(x, y, w, h) { this.x = x; this.y = y; this.w = w; this.h = h; }
+    draw() {
+      ctx.fillStyle = '#f87171'; ctx.shadowColor = '#f87171'; ctx.shadowBlur = 12;
+      ctx.beginPath();
+      for (let i = 0; i <= 4; i++) {
+        const x = this.x + (i / 4) * this.w;
+        const hh = i % 2 === 0 ? this.h : this.h * 0.6;
+        if (i === 0) ctx.moveTo(x, this.y + this.h);
+        ctx.lineTo(x, this.y + this.h - hh);
+        ctx.lineTo(x + this.w / 4, this.y + this.h);
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+  class Switch {
+    constructor(x, y, target) {
+      this.x = x; this.y = y; this.w = 20; this.h = 20; this.target = target; this.active = false;
+    }
+    draw() {
+      ctx.fillStyle = this.active ? '#34d399' : '#fbbf24';
+      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12;
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+      ctx.shadowBlur = 0;
+    }
+  }
+  class Exit {
+    constructor(x, y) { this.x = x; this.y = y; this.w = 30; this.h = 30; }
+    draw() {
+      ctx.fillStyle = '#34d399'; ctx.shadowColor = '#34d399'; ctx.shadowBlur = 15;
+      ctx.beginPath();
+      ctx.moveTo(this.x + this.w/2, this.y);
+      ctx.lineTo(this.x + this.w, this.y + this.h/2);
+      ctx.lineTo(this.x + this.w/2, this.y + this.h);
+      ctx.lineTo(this.x, this.y + this.h/2);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  let player;
+  let platforms = [];
+  let crates = [];
+  let hazards = [];
+  let switches = [];
+  let exit = null;
+  let gravityWells = [];
+  let particles = [];
+  let level = 1;
+  let score = 0;
+  let gameRunning = false;
+  let gameOver = false;
+  let frameCount = 0;
+  let levelStartTime = 0;
+  let screenShake = 0;
+  let gravityWellCooldown = 0;
+
+  function updateHUD() {
+    energyDisplay.textContent = Math.ceil(player.energy);
+    levelDisplay.textContent = level;
+    timerDisplay.textContent = formatTime(Date.now() - levelStartTime);
+    const bt = getBest(level);
+    bestTimeDisplay.textContent = bt > 0 ? formatTime(bt) : '--:--';
+  }
+
+  function createExplosion(x, y, color, count, speed) {
+    for (let i = 0; i < count; i++) particles.push({ x, y, color, vx: (random(0,1)-0.5)*speed*2, vy: (random(0,1)-0.5)*speed*2, life: random(15,30), size: random(2,5) });
+  }
+
+  function endGame() {
+    gameOver = true;
+    gameRunning = false;
+    finalScore.textContent = 'Level: ' + level;
+    finalTime.textContent = 'Time: ' + formatTime((Date.now() - levelStartTime)/1000);
+    finalBest.textContent = 'Best: ' + (getBest(level) > 0 ? formatTime(getBest(level)) : '--:--');
+    gameOverScreen.classList.add('visible');
+    updateHUD();
+  }
+
+  function initGame() {
+    player = new Player();
+    platforms = []; crates = []; hazards = []; switches = []; gravityWells = []; particles = []; explosions = [];
+    exit = null;
+    level = 1; score = 0;
+    gameOver = false; frameCount = 0; screenShake = 0; gravityWellCooldown = 0;
+    loadLevel(1);
+    updateHUD();
+  }
+
+  function loadLevel(lvl) {
+    platforms = []; crates = []; hazards = []; switches = []; gravityWells = []; exit = null;
+    player.x = 100; player.y = 100; player.vx = 0; player.vy = 0; player.dead = false; player.invulnerable = 0;
+    if (lvl === 1) {
+      platforms.push(new Platform(100, 520, 200, 20));
+      platforms.push(new Platform(350, 440, 200, 20));
+      platforms.push(new Platform(600, 360, 200, 20));
+      platforms.push(new Platform(850, 280, 120, 20));
+      platforms.push(new Platform(0, CH - 20, CW, 20));
+      crates.push(new Crate(250, 480));
+      hazards.push(new Hazard(400, CH - 40, 60, 20));
+      switches.push(new Switch(120, 480, null));
+      exit = new Exit(900, 230);
+    } else if (lvl === 2) {
+      platforms.push(new Platform(0, CH - 20, CW, 20));
+      platforms.push(new Platform(150, 560, 150, 20));
+      platforms.push(new Platform(350, 480, 150, 20));
+      platforms.push(new Platform(550, 400, 150, 20));
+      platforms.push(new Platform(750, 320, 150, 20));
+      platforms.push(new Platform(900, 240, 80, 20));
+      hazards.push(new Hazard(300, CH - 40, 80, 20));
+      hazards.push(new Hazard(700, CH - 40, 60, 20));
+      crates.push(new Crate(220, 520));
+      exit = new Exit(930, 190);
+    } else if (lvl === 3) {
+      platforms.push(new Platform(0, CH - 20, CW, 20));
+      platforms.push(new Platform(200, 580, 120, 20));
+      platforms.push(new Platform(400, 500, 120, 20));
+      platforms.push(new Platform(600, 420, 120, 20));
+      platforms.push(new Platform(800, 340, 120, 20));
+      hazards.push(new Hazard(500, CH - 40, 100, 20));
+      crates.push(new Crate(280, 540));
+      crates.push(new Crate(480, 460));
+      exit = new Exit(840, 290);
+    } else {
+      // Procedural
+      platforms.push(new Platform(0, CH - 20, CW, 20));
+      for (let i = 0; i < 6; i++) {
+        platforms.push(new Platform(random(100, CW - 200), random(250, CH - 100), random(100, 200), 20));
+      }
+      for (let i = 0; i < 3; i++) hazards.push(new Hazard(random(100, CW - 100), CH - 40, random(40, 80), 20));
+      for (let i = 0; i < 2; i++) crates.push(new Crate(random(150, CW - 150), random(300, CH - 100)));
+      exit = new Exit(random(700, CW - 60), random(150, 300));
+    }
+    levelStartTime = Date.now();
+    updateHUD();
+  }
+
+  function startGame() {
+    startScreen.style.display = 'none';
+    gameOverScreen.classList.remove('visible');
+    initGame();
+    gameRunning = true;
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', startGame);
+
+  function loop() {
+    if (!gameRunning) return;
+    frameCount++;
+
+    if (keys['KeyR'] && gameOver) { startGame(); keys['KeyR'] = false; return; }
+
+    // Gravity well
+    if (mouse.justClicked && gravityWellCooldown <= 0 && player.energy >= 20 && !player.dead) {
+      gravityWells.push({ x: mouse.x, y: mouse.y, life: 120, radius: 140, strength: 0.8 });
+      player.energy -= 20;
+      gravityWellCooldown = 40;
+      screenShake = 6;
+      createExplosion(mouse.x, mouse.y, '#a78bfa', 8, 15);
+      updateHUD();
+    }
+    if (gravityWellCooldown > 0) gravityWellCooldown--;
+    if (player.energy < player.maxEnergy) player.energy += 0.15;
+
+    player.update(platforms);
+
+    // Gravity wells effect
+    for (let i = gravityWells.length - 1; i >= 0; i--) {
+      const g = gravityWells[i];
+      g.life--;
+      // Pull player
+      const d = dist(player.x, player.y, g.x, g.y);
+      if (d < g.radius && d > 0) {
+        const ang = Math.atan2(g.y - player.y, g.x - player.x);
+        player.vx += Math.cos(ang) * g.strength;
+        player.vy += Math.sin(ang) * g.strength;
+      }
+      // Pull crates
+      for (const c of crates) {
+        const d = dist(c.x, c.y, g.x, g.y);
+        if (d < g.radius && d > 0) {
+          const ang = Math.atan2(g.y - c.y, g.x - c.x);
+          c.vx += Math.cos(ang) * g.strength * 0.5;
+          c.vy += Math.sin(ang) * g.strength * 0.5;
+        }
+      }
+      if (g.life <= 0) gravityWells.splice(i, 1);
+    }
+
+    // Update crates
+    for (const c of crates) c.update(platforms);
+
+    // Crate-player collision
+    for (const c of crates) {
+      if (dist(player.x, player.y, c.x + c.w/2, c.y + c.h/2) < player.radius + c.w/2) {
+        // Push apart
+        const ang = Math.atan2(player.y - (c.y + c.h/2), player.x - (c.x + c.w/2));
+        const overlap = player.radius + c.w/2 - dist(player.x, player.y, c.x + c.w/2, c.y + c.h/2);
+        if (overlap > 0) {
+          player.x += Math.cos(ang) * overlap;
+          player.y += Math.sin(ang) * overlap;
+          c.x -= Math.cos(ang) * overlap * 0.3;
+          c.y -= Math.sin(ang) * overlap * 0.3;
+        }
+      }
+    }
+
+    // Hazard collision
+    for (const h of hazards) {
+      if (player.x > h.x && player.x < h.x + h.w &&
+          player.y > h.y && player.y < h.y + h.h && player.invulnerable <= 0) {
+        player.hp -= 1;
+        player.invulnerable = 30;
+        screenShake = 5;
+        if (player.hp <= 0) player.dead = true;
+      }
+    }
+
+    // Exit
+    if (exit && dist(player.x, player.y, exit.x + exit.w/2, exit.y + exit.h/2) < player.radius + exit.w/2) {
+      const t = Math.floor((Date.now() - levelStartTime) / 1000);
+      const bt = getBest(level);
+      if (bt === 0 || t < bt) setBest(level, t);
+      level++;
+      score += 100 + t * 5;
+      loadLevel(level);
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.9; p.vy *= 0.9;
+      p.life--;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    if (screenShake > 0) screenShake *= 0.9;
+
+    // Player death
+    if (player.dead) {
+      loadLevel(level);
+      return;
+    }
+
+    // Draw
+    ctx.save();
+    if (screenShake > 0) ctx.translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
+
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(99,102,241,0.08)';
+    ctx.lineWidth = 1;
+    const gs = 60;
+    const off = (frameCount * 0.2) % gs;
+    for (let x = -gs + off; x < CW; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CH); ctx.stroke(); }
+    for (let y = -gs + off; y < CH; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CW, y); ctx.stroke(); }
+
+    for (const p of platforms) p.draw();
+    for (const h of hazards) h.draw();
+    for (const c of crates) c.draw();
+    for (const s of switches) s.draw();
+    if (exit) exit.draw();
+
+    // Gravity wells
+    for (const g of gravityWells) {
+      ctx.globalAlpha = g.life / 120;
+      ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 2; ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(g.x, g.y, g.radius, 0, Math.PI*2); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+
+    for (const p of particles) {
+      ctx.globalAlpha = p.life / 30;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+      ctx.globalAlpha = 1;
+    }
+
+    player.draw();
+
+    ctx.restore();
+    updateHUD();
+    requestAnimationFrame(loop);
+  }
+
+  startScreen.style.display = 'flex';
+  gameOverScreen.classList.remove('visible');
+  updateHUD();
+
+})();
+</script>
+</body>
+</html>
+HTMLEOF
+echo "GL_PART2_OK"
