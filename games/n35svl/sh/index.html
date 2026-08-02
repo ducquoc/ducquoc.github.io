@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHADOW HEIST</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0b0c10; color: #e2e8f0;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  canvas {
+    display: block; border: 2px solid #1f2937;
+    box-shadow: 0 0 60px rgba(16,185,129,0.12), inset 0 0 60px rgba(0,0,0,0.95);
+    background: #050507; max-width: 100%; max-height: 90vh;
+    cursor: crosshair;
+  }
+  #hud {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 55px; pointer-events: none; z-index: 10;
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+  .hud-item { text-align: center; }
+  .hud-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+  .hud-value { font-size: 24px; font-weight: bold; text-shadow: 0 0 12px currentColor; }
+  .hud-value.detect { color: #f87171; }
+  .hud-value.money { color: #fbbf24; }
+  .hud-value.mission { color: #a78bfa; }
+  .hud-value.score { color: #38bdf8; }
+  .hud-value.best { color: #34d399; }
+  #start-screen {
+    position: absolute; inset: 0; background: radial-gradient(circle, #1a1a2e 0%, #0b0c10 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(8px);
+  }
+  .title { font-size: 60px; font-weight: bold; color: #38bdf8; letter-spacing: 10px;
+    margin-bottom: 10px; text-shadow: 0 0 30px rgba(56,189,248,0.8); }
+  .subtitle { font-size: 16px; color: #94a3b8; letter-spacing: 6px; margin-bottom: 40px;
+    text-shadow: 0 0 15px rgba(148,163,184,0.4); font-style: italic; }
+  .controls { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px;
+    max-width: 360px; margin-bottom: 40px; }
+  .control { padding: 10px 16px; border: 1px solid #334155; border-radius: 6px;
+    background: rgba(30,41,59,0.5); color: #cbd5e1; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px; }
+  .control kbd { color: #38bdf8; font-weight: bold; }
+  .press-start {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #38bdf8; background: transparent; border: 2px solid #38bdf8;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(56,189,248,0.4);
+  }
+  .press-start:hover { background: #38bdf8; color: #0b0c10;
+    box-shadow: 0 0 35px rgba(56,189,248,0.9); }
+  #game-over {
+    position: absolute; inset: 0; background: rgba(11,12,16,0.94);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(10px);
+  }
+  #game-over.visible { display: flex; }
+  .game-title { font-size: 52px; font-weight: bold; color: #f87171; margin-bottom: 16px;
+    text-shadow: 0 0 25px rgba(248,113,113,0.8); }
+  .final-stats { font-size: 20px; color: #e2e8f0; margin-bottom: 8px; }
+  .press-r {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #38bdf8; background: transparent; border: 2px solid #38bdf8;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(56,189,248,0.4);
+  }
+  .press-r:hover { background: #38bdf8; color: #0b0c10;
+    box-shadow: 0 0 35px rgba(56,189,248,0.9); }
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 30;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%,
+      rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.35)); background-size: 100% 4px;
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 31;
+    background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.9) 100%);
+  }
+</style>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <canvas id="gameCanvas" width="1000" height="700"></canvas>
+  <div id="hud">
+    <div class="hud-item"><div class="hud-label">detection</div><div class="hud-value detect" id="detectionDisplay">0</div></div>
+    <div class="hud-item"><div class="hud-label">loot</div><div class="hud-value money" id="moneyDisplay">0</div></div>
+    <div class="hud-item"><div class="hud-label">mission</div><div class="hud-value mission" id="missionDisplay">1</div></div>
+    <div class="hud-item"><div class="hud-label">score</div><div class="hud-value score" id="scoreDisplay">0</div></div>
+    <div class="hud-item"><div class="hud-label">best</div><div class="hud-value best" id="bestScoreDisplay">0</div></div>
+  </div>
+  <div id="start-screen">
+    <div class="title">SHADOW HEIST</div>
+    <div class="subtitle">Stay unseen. Take everything. Escape.</div>
+    <div class="controls">
+      <div class="control">Move <kbd>WASD</kbd></div>
+      <div class="control">Distraction <kbd>SPACE</kbd></div>
+      <div class="control">Stealth <kbd>MOUSE</kbd></div>
+    </div>
+    <button class="press-start" id="startBtn">Infiltrate</button>
+  </div>
+  <div id="game-over">
+    <div class="game-title">Caught</div>
+    <div class="final-stats" id="finalScore">Score: 0</div>
+    <div class="final-stats" id="finalMission">Mission: 1</div>
+    <div class="final-stats" id="finalBest">Best score: 0</div>
+    <button class="press-r" id="restartBtn">Restart (R)</button>
+  </div>
+<script>
+(function(){
+  'use strict';
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+
+  const detectionDisplay = document.getElementById('detectionDisplay');
+  const moneyDisplay = document.getElementById('moneyDisplay');
+  const missionDisplay = document.getElementById('missionDisplay');
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const bestScoreDisplay = document.getElementById('bestScoreDisplay');
+  const startScreen = document.getElementById('start-screen');
+  const gameOverScreen = document.getElementById('game-over');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const finalScore = document.getElementById('finalScore');
+  const finalMission = document.getElementById('finalMission');
+  const finalBest = document.getElementById('finalBest');
+
+  let bestScore = 0;
+  try {
+    const s = localStorage.getItem('shadowHeistBestScore');
+    if (s !== null) bestScore = parseInt(s, 10) || 0;
+  } catch (e) {}
+  bestScoreDisplay.textContent = bestScore;
+
+  const mouse = { x: CW/2, y: CH/2 };
+  window.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  const keys = {};
+  window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+  function random(min, max) { return Math.random() * (max - min) + min; }
+  function dist(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  class Guard {
+    constructor(mission) {
+      this.radius = 10;
+      this.hp = 1;
+      this.speed = 1.4 + mission * 0.06;
+      this.path = [];
+      this.pathIndex = 0;
+      this.dead = false;
+      this.visionRange = 220;
+      this.visionAngle = 60;
+      this.detectionRate = 1.2;
+      this.state = 'patrol';
+      this.investigateX = 0; this.investigateY = 0;
+      this.investigateTimer = 0;
+      this.setupPath(mission);
+    }
+    setupPath(mission) {
+      const pts = [];
+      const count = 4 + mission;
+      for (let i = 0; i < count; i++) {
+        pts.push({ x: random(80, CW - 80), y: random(80, CH - 80) });
+      }
+      this.path = pts;
+    }
+    update(player, walls) {
+      if (this.dead) return;
+      if (this.state === 'investigate') {
+        this.investigateTimer--;
+        if (this.investigateTimer <= 0) this.state = 'patrol';
+        const ang = angleTo(this.investigateX, this.investigateY, this.x, this.y);
+        this.x += Math.cos(ang) * this.speed * 0.7;
+        this.y += Math.sin(ang) * this.speed * 0.7;
+      } else {
+        const target = this.path[this.pathIndex];
+        const ang = angleTo(target.x, target.y, this.x, this.y);
+        this.x += Math.cos(ang) * this.speed;
+        this.y += Math.sin(ang) * this.speed;
+        if (dist(this.x, this.y, target.x, target.y) < 15) {
+          this.pathIndex = (this.pathIndex + 1) % this.path.length;
+        }
+      }
+      // Vision cone detection
+      const d = dist(this.x, this.y, player.x, player.y);
+      if (d < this.visionRange) {
+        const angToPlayer = angleTo(player.x, player.y, this.x, this.y);
+        const diff = Math.abs(((angToPlayer - this.angle + Math.PI) % (Math.PI * 2)) - Math.PI);
+        if (diff < this.visionAngle * Math.PI / 180) {
+          // Check wall block
+          let blocked = false;
+          for (const w of walls) {
+            if (lineIntersectsRect(this.x, this.y, player.x, player.y, w)) { blocked = true; break; }
+          }
+          if (!blocked) {
+            this.state = 'investigate';
+            this.investigateX = player.x;
+            this.investigateY = player.y;
+            this.investigateTimer = 120;
+            return 1; // detection rate
+          }
+        }
+      }
+      return 0;
+    }
+    draw() {
+      if (this.dead) return;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.angle);
+      ctx.fillStyle = '#f87171'; ctx.shadowColor = '#f87171'; ctx.shadowBlur = 10;
+      ctx.fillRect(-10, -6, 20, 12);
+      ctx.shadowBlur = 0;
+      // Vision cone
+      ctx.fillStyle = 'rgba(248,113,113,0.08)';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(this.visionRange * Math.cos(-this.visionAngle * Math.PI / 360), this.visionRange * Math.sin(-this.visionAngle * Math.PI / 360));
+      ctx.arc(0, 0, this.visionRange, -this.visionAngle * Math.PI / 360, this.visionAngle * Math.PI / 360);
+      ctx.lineTo(this.visionRange * Math.cos(this.visionAngle * Math.PI / 360), this.visionRange * Math.sin(this.visionAngle * Math.PI / 360));
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class Camera {
+    constructor(x, y, angle, range) {
+      this.x = x; this.y = y; this.angle = angle; this.range = range;
+      this.visionAngle = 45;
+      this.detectionRate = 2.0;
+      this.sweep = 0;
+      this.dir = 1;
+    }
+    update(player, walls) {
+      this.angle += this.dir * 0.02 * this.sweep;
+      this.sweep += this.dir * 0.002;
+      if (this.sweep > 1 || this.sweep < -1) this.dir *= -1;
+      const d = dist(this.x, this.y, player.x, player.y);
+      if (d < this.range) {
+        const angToPlayer = angleTo(player.x, player.y, this.x, this.y);
+        const diff = Math.abs(((angToPlayer - this.angle + Math.PI) % (Math.PI * 2)) - Math.PI);
+        if (diff < this.visionAngle * Math.PI / 180) {
+          let blocked = false;
+          for (const w of walls) {
+            if (lineIntersectsRect(this.x, this.y, player.x, player.y, w)) { blocked = true; break; }
+          }
+          if (!blocked) return this.detectionRate;
+        }
+      }
+      return 0;
+    }
+    draw() {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.angle);
+      ctx.fillStyle = '#38bdf8'; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 10;
+      ctx.fillRect(-6, -4, 12, 8);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(56,189,248,0.1)';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(this.range * Math.cos(-this.visionAngle * Math.PI / 360), this.range * Math.sin(-this.visionAngle * Math.PI / 360));
+      ctx.arc(0, 0, this.range, -this.visionAngle * Math.PI / 360, this.visionAngle * Math.PI / 360);
+      ctx.lineTo(this.range * Math.cos(this.visionAngle * Math.PI / 360), this.range * Math.sin(this.visionAngle * Math.PI / 360));
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class Loot {
+    constructor(x, y, value) {
+      this.x = x; this.y = y; this.value = value;
+      this.radius = 7;
+      this.collected = false;
+    }
+    update(player) {
+      if (this.collected) return;
+      if (dist(this.x, this.y, player.x, player.y) < player.radius + this.radius) {
+        this.collected = true;
+        return this.value;
+      }
+      return 0;
+    }
+    draw() {
+      if (this.collected) return;
+      ctx.fillStyle = '#fbbf24'; ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  class Particle {
+    constructor(x, y, color) {
+      this.x = x; this.y = y; this.color = color;
+      const ang = random(0, Math.PI*2);
+      const sp = random(1, 5);
+      this.vx = Math.cos(ang) * sp; this.vy = Math.sin(ang) * sp;
+      this.life = random(20, 40); this.maxLife = this.life;
+      this.size = random(2, 5);
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vx *= 0.92; this.vy *= 0.92;
+      this.life--;
+    }
+    draw() {
+      const a = this.life / this.maxLife;
+      ctx.globalAlpha = a; ctx.fillStyle = this.color;
+      ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function angleTo(tx, ty, sx, sy) { return Math.atan2(ty - sy, tx - sx); }
+  function lineIntersectsRect(x1, y1, x2, y2, rect) {
+    // Check if line segment intersects rect
+    const left = rect.x, right = rect.x + rect.w, top = rect.y, bottom = rect.y + rect.h;
+    if ((x1 < left && x2 < left) || (x1 > right && x2 > right) ||
+        (y1 < top && y2 < top) || (y1 > bottom && y2 > bottom)) return false;
+    return true;
+  }
+
+  let player;
+  let guards = [];
+  let cameras = [];
+  let loot = [];
+  let particles = [];
+  let explosions = [];
+  let walls = [];
+  let mission = 1;
+  let score = 0;
+  let money = 0;
+  let detection = 0;
+  let gameRunning = false;
+  let gameOver = false;
+  let frameCount = 0;
+  let distractionTimer = 0;
+  let distractionX = 0; distractionY = 0;
+  let screenShake = 0;
+
+  function updateHUD() {
+    detectionDisplay.textContent = Math.ceil(detection);
+    moneyDisplay.textContent = money;
+    missionDisplay.textContent = mission;
+    scoreDisplay.textContent = score;
+    bestScoreDisplay.textContent = bestScore;
+  }
+
+  function addScore(amount) {
+    score += amount;
+    if (score > bestScore) {
+      bestScore = score;
+      try { localStorage.setItem('shadowHeistBestScore', String(bestScore)); } catch (e) {}
+    }
+    updateHUD();
+  }
+
+  function createExplosion(x, y, color, count, speed) {
+    for (let i = 0; i < count; i++) particles.push({ x, y, color, vx: (random(0,1)-0.5)*speed*2, vy: (random(0,1)-0.5)*speed*2, life: random(15,30), size: random(2,5) });
+  }
+
+  function endGame() {
+    gameOver = true;
+    gameRunning = false;
+    finalScore.textContent = 'Score: ' + score;
+    finalMission.textContent = 'Mission: ' + mission;
+    finalBest.textContent = 'Best score: ' + bestScore;
+    gameOverScreen.classList.add('visible');
+    updateHUD();
+  }
+
+  function initGame() {
+    player = { x: 100, y: CH/2, hp: 100, angle: 0, invulnerable: 0, dead: false, radius: 10, speed: 3.8 };
+    guards = []; cameras = []; loot = []; particles = []; explosions = [];
+    mission = 1; score = 0; money = 0; detection = 0;
+    gameOver = false; frameCount = 0; distractionTimer = 0; screenShake = 0;
+    walls = [
+      { x: 150, y: 100, w: 120, h: 260 },
+      { x: 400, y: 340, w: 260, h: 120 },
+      { x: 700, y: 150, w: 120, h: 260 },
+      { x: 250, y: 460, w: 300, h: 20 },
+      { x: 600, y: 460, w: 150, h: 20 },
+      { x: 0, y: 0, w: CW, h: 20 },
+      { x: 0, y: CH - 20, w: CW, h: 20 },
+      { x: 0, y: 0, w: 20, h: CH },
+      { x: CW - 20, y: 0, w: 20, h: CH },
+    ];
+    updateHUD();
+    loadMission(1);
+  }
+
+  function loadMission(m) {
+    mission = m; detection = 0;
+    guards = []; cameras = []; loot = []; explosions = [];
+    const guardCount = 3 + m * 2;
+    for (let i = 0; i < guardCount; i++) guards.push(new Guard(m));
+    const camCount = 1 + Math.floor(m / 2);
+    for (let i = 0; i < camCount; i++) cameras.push(new Camera(random(150, CW - 150), random(150, CH - 150), random(0, Math.PI*2), 180 + m * 20));
+    const lootCount = 6 + m * 3;
+    for (let i = 0; i < lootCount; i++) loot.push(new Loot(random(100, CW - 100), random(100, CH - 100), 50 + m * 10));
+    player.x = 100; player.y = CH/2;
+    updateHUD();
+  }
+
+  function startGame() {
+    startScreen.style.display = 'none';
+    gameOverScreen.classList.remove('visible');
+    initGame();
+    gameRunning = true;
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', startGame);
+
+  function loop() {
+    if (!gameRunning) return;
+    frameCount++;
+
+    if (keys['KeyR'] && gameOver) { startGame(); keys['KeyR'] = false; return; }
+
+    if (keys['Space'] && distractionTimer <= 0 && !player.dead) {
+      distractionX = mouse.x; distractionY = mouse.y;
+      distractionTimer = 180;
+      createExplosion(mouse.x, mouse.y, '#fbbf24', 6, 15);
+      screenShake = 6;
+    }
+    if (distractionTimer > 0) {
+      distractionTimer--;
+      // Guards distracted
+      for (const g of guards) {
+        if (dist(g.x, g.y, distractionX, distractionY) < g.visionRange * 1.5) {
+          g.state = 'investigate';
+          g.investigateX = distractionX;
+          g.investigateY = distractionY;
+          g.investigateTimer = 30;
+        }
+      }
+    }
+
+    // Player movement
+    let dx = 0, dy = 0;
+    if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+    if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
+    if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+    if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len > 0) { dx /= len; dy /= len; }
+    player.x += dx * player.speed;
+    player.y += dy * player.speed;
+    player.x = clamp(player.x, 20, CW - 20);
+    player.y = clamp(player.y, 20, CH - 20);
+    player.angle = angleTo(mouse.x, mouse.y, player.x, player.y);
+    if (player.invulnerable > 0) player.invulnerable--;
+
+    // Detection from guards
+    for (const g of guards) {
+      detection += g.update(player, walls);
+    }
+    // Detection from cameras
+    for (const c of cameras) {
+      detection += c.update(player, walls);
+    }
+    if (detection > 0) detection -= 0.15;
+    if (detection < 0) detection = 0;
+    if (detection >= 100) {
+      endGame();
+      return;
+    }
+
+    // Loot
+    for (let i = loot.length - 1; i >= 0; i--) {
+      const gained = loot[i].update(player);
+      if (gained > 0) {
+        money += gained;
+        score += gained;
+        addScore(0);
+        loot.splice(i, 1);
+      } else if (loot[i].collected) {
+        loot.splice(i, 1);
+      }
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      const e = explosions[i];
+      e.x += e.vx; e.y += e.vy;
+      e.vx *= 0.9; e.vy *= 0.9;
+      e.life--;
+      if (e.life <= 0) explosions.splice(i, 1);
+    }
+
+    if (screenShake > 0) screenShake *= 0.9;
+
+    // Mission complete - all loot collected
+    if (loot.length === 0) {
+      score += 500 + mission * 200;
+      money += 300 + mission * 100;
+      addScore(0);
+      mission++;
+      loadMission(mission);
+    }
+
+    // Draw
+    ctx.save();
+    if (screenShake > 0) ctx.translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
+
+    ctx.fillStyle = '#0b0c10';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Walls
+    ctx.fillStyle = '#334155'; ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2;
+    for (const w of walls) {
+      ctx.fillRect(w.x, w.y, w.w, w.h);
+      ctx.strokeRect(w.x, w.y, w.w, w.h);
+    }
+
+    // Loot
+    for (const l of loot) l.draw();
+
+    // Distraction marker
+    if (distractionTimer > 0) {
+      ctx.fillStyle = 'rgba(255,190,0,0.4)';
+      ctx.beginPath(); ctx.arc(distractionX, distractionY, 40 + Math.sin(frameCount * 0.2) * 5, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Cameras
+    for (const c of cameras) c.draw();
+
+    // Guards
+    for (const g of guards) g.draw();
+
+    // Particles
+    for (const p of particles) p.draw();
+
+    // Explosions
+    for (const e of explosions) {
+      ctx.globalAlpha = e.life / 30;
+      ctx.strokeStyle = e.color; ctx.lineWidth = 2; ctx.shadowColor = e.color; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.size * (30 - e.life)/10, 0, Math.PI*2); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+
+    // Player
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+    const flash = player.invulnerable > 0 && frameCount % 6 < 3;
+    if (flash) ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#38bdf8'; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.moveTo(0, -player.radius);
+    ctx.lineTo(player.radius * 0.866, player.radius * 0.5);
+    ctx.lineTo(0, -player.radius * 0.2);
+    ctx.lineTo(-player.radius * 0.866, player.radius * 0.5);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    ctx.restore();
+    updateHUD();
+    requestAnimationFrame(loop);
+  }
+
+  startScreen.style.display = 'flex';
+  gameOverScreen.classList.remove('visible');
+  updateHUD();
+
+})();
+</script>
+</body>
+</html>
+HTMLEOF
+echo "SH_PART2_OK"
