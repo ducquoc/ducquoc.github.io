@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIXEL FISHER</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f172a; color: #e2e8f0;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  canvas {
+    display: block; border: 2px solid #1e293b;
+    box-shadow: 0 0 60px rgba(34,211,238,0.15), inset 0 0 60px rgba(0,0,0,0.9);
+    background: linear-gradient(#0f172a, #1e293b); max-width: 100%; max-height: 90vh;
+    cursor: crosshair;
+  }
+  #hud {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 55px; pointer-events: none; z-index: 10;
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+  .hud-item { text-align: center; }
+  .hud-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+  .hud-value { font-size: 24px; font-weight: bold; text-shadow: 0 0 12px currentColor; }
+  .hud-value.money { color: #fbbf24; }
+  .hud-value.day { color: #a78bfa; }
+  .hud-value.biggest { color: #f472b6; }
+  .hud-value.earnings { color: #34d399; }
+  #shop-panel {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 560px; display: none; flex-direction: column; gap: 12px;
+    z-index: 20; background: rgba(15,23,42,0.95);
+    border: 2px solid #a78bfa; border-radius: 12px; padding: 24px;
+    backdrop-filter: blur(8px);
+  }
+  #shop-panel.visible { display: flex; }
+  .shop-title { font-size: 24px; color: #a78bfa; text-align: center;
+    margin-bottom: 16px; text-transform: uppercase; letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(167,139,250,0.8); }
+  .shop-item {
+    display: flex; gap: 16px; background: rgba(30,41,59,0.8);
+    border: 1px solid #475569; border-radius: 8px; padding: 14px;
+    cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .shop-item:hover { border-color: #a78bfa; background: rgba(30,41,59,1); }
+  .shop-item.disabled { opacity: 0.6; cursor: not-allowed; }
+  .shop-item h4 { color: #e2e8f0; margin-bottom: 4px; }
+  .shop-item p { font-size: 12px; color: #94a3b8; }
+  .shop-item .cost { color: #fbbf24; font-weight: bold; margin-left: auto; }
+  #start-screen {
+    position: absolute; inset: 0; background: radial-gradient(circle, #1e1b4b 0%, #0f172a 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(8px);
+  }
+  .title { font-size: 60px; font-weight: bold; color: #38bdf8; letter-spacing: 10px;
+    margin-bottom: 10px; text-shadow: 0 0 30px rgba(56,189,248,0.8); }
+  .subtitle { font-size: 16px; color: #94a3b8; letter-spacing: 6px; margin-bottom: 40px;
+    text-shadow: 0 0 15px rgba(148,163,184,0.4); font-style: italic; }
+  .controls { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px;
+    max-width: 360px; margin-bottom: 40px; }
+  .control { padding: 10px 16px; border: 1px solid #334155; border-radius: 6px;
+    background: rgba(30,41,59,0.5); color: #cbd5e1; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px; }
+  .control kbd { color: #38bdf8; font-weight: bold; }
+  .press-start {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #38bdf8; background: transparent; border: 2px solid #38bdf8;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(56,189,248,0.4);
+  }
+  .press-start:hover { background: #38bdf8; color: #0f172a;
+    box-shadow: 0 0 35px rgba(56,189,248,0.9); }
+  #game-over {
+    position: absolute; inset: 0; background: rgba(15,23,42,0.94);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(10px);
+  }
+  #game-over.visible { display: flex; }
+  .game-title { font-size: 52px; font-weight: bold; color: #f87171; margin-bottom: 16px;
+    text-shadow: 0 0 25px rgba(248,113,113,0.8); }
+  .final-stats { font-size: 20px; color: #e2e8f0; margin-bottom: 8px; }
+  .press-r {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #38bdf8; background: transparent; border: 2px solid #38bdf8;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(56,189,248,0.4);
+  }
+  .press-r:hover { background: #38bdf8; color: #0f172a;
+    box-shadow: 0 0 35px rgba(56,189,248,0.9); }
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 30;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%,
+      rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.35)); background-size: 100% 4px;
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 31;
+    background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.85) 100%);
+  }
+</style>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <canvas id="gameCanvas" width="1000" height="700"></canvas>
+  <div id="hud">
+    <div class="hud-item"><div class="hud-label">money</div><div class="hud-value money" id="moneyDisplay">0</div></div>
+    <div class="hud-item"><div class="hud-label">day</div><div class="hud-value day" id="dayDisplay">1</div></div>
+    <div class="hud-item"><div class="hud-label">biggest</div><div class="hud-value biggest" id="biggestDisplay">0</div></div>
+    <div class="hud-item"><div class="hud-label">earnings</div><div class="hud-value earnings" id="earningsDisplay">0</div></div>
+  </div>
+  <div id="shop-panel">
+    <div class="shop-title">Tackle Shop</div>
+    <div class="shop-item" id="shopRod"><h4>Rod</h4><p>Better casting distance</p><span class="cost">$100</span></div>
+    <div class="shop-item" id="shopLine"><h4>Line</h4><p>Stronger line for big fish</p><span class="cost">$150</span></div>
+    <div class="shop-item" id="shopLure"><h4>Lure</h4><p>Attracts rarer fish</p><span class="cost">$200</span></div>
+    <div class="shop-item" id="shopBoat"><h4>Boat</h4><p>Reach deeper waters</p><span class="cost">$500</span></div>
+  </div>
+  <div id="start-screen">
+    <div class="title">PIXEL FISHER</div>
+    <div class="subtitle">Cast your line. Reel in the legends.</div>
+    <div class="controls">
+      <div class="control">Boat <kbd>A/D</kbd></div>
+      <div class="control">Cast <kbd>CLICK</kbd></div>
+      <div class="control">Reel <kbd>CLICK</kbd></div>
+    </div>
+    <button class="press-start" id="startBtn">Cast Off</button>
+  </div>
+  <div id="game-over">
+    <div class="game-title">Day's End</div>
+    <div class="final-stats" id="finalScore">Total: $0</div>
+    <div class="final-stats" id="finalBest">Biggest: 0 lb</div>
+    <button class="press-r" id="restartBtn">New Day (R)</button>
+  </div>
+<script>
+(function(){
+  'use strict';
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+
+  const moneyDisplay = document.getElementById('moneyDisplay');
+  const dayDisplay = document.getElementById('dayDisplay');
+  const biggestDisplay = document.getElementById('biggestDisplay');
+  const earningsDisplay = document.getElementById('earningsDisplay');
+  const startScreen = document.getElementById('start-screen');
+  const gameOverScreen = document.getElementById('game-over');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const finalScore = document.getElementById('finalScore');
+  const finalBest = document.getElementById('finalBest');
+  const shopPanel = document.getElementById('shop-panel');
+
+  let biggestFish = 0;
+  try {
+    const s = localStorage.getItem('pixelFisherBiggest');
+    if (s !== null) biggestFish = parseFloat(s) || 0;
+  } catch (e) {}
+  biggestDisplay.textContent = biggestFish + ' lb';
+  let totalEarnings = 0;
+
+  const keys = {};
+  window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+  const mouse = { x: CW/2, y: CH/2, down: false, justClicked: false };
+  window.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  window.addEventListener('mousedown', () => { mouse.down = true; mouse.justClicked = true; });
+  window.addEventListener('mouseup', () => { mouse.down = false; });
+  window.addEventListener('click', () => { mouse.justClicked = false; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  function random(min, max) { return Math.random() * (max - min) + min; }
+  function dist(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  const FISH_SPECIES = [
+    { name: 'Minnow',   rarity: 'common',  weight: random(0.5, 2), value: 5,   color: '#94a3b8', speed: 2,  behavior: 'straight' },
+    { name: 'Perch',    rarity: 'common',  weight: random(1, 3),   value: 8,   color: '#f472b6', speed: 2.5, behavior: 'wiggle' },
+    { name: 'Bass',     rarity: 'uncommon',weight: random(2, 5),   value: 15,  color: '#22d3ee', speed: 3,  behavior: 'dash' },
+    { name: 'Trout',    rarity: 'uncommon',weight: random(3, 7),   value: 25,  color: '#34d399', speed: 3.5, behavior: 'circle' },
+    { name: 'Salmon',   rarity: 'rare',    weight: random(5, 10),  value: 50,  color: '#f59e0b', speed: 4,  behavior: 'dash' },
+    { name: 'Catfish',  rarity: 'rare',    weight: random(8, 15),  value: 75,  color: '#6b7280', speed: 2,  behavior: 'slow' },
+    { name: 'Tuna',     rarity: 'epic',    weight: random(15, 30), value: 150, color: '#ef4444', speed: 5,  behavior: 'fast' },
+    { name: 'Marlin',   rarity: 'legendary',weight: random(40, 80), value: 500, color: '#a78bfa', speed: 6,  behavior: 'elite' },
+  ];
+
+  class Boat {
+    constructor() {
+      this.x = CW / 2; this.y = CH / 2; this.vx = 0; this.vy = 0;
+      this.radius = 14; this.speed = 3.5;
+    }
+    update() {
+      let dx = 0, dy = 0;
+      if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+      if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+      if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+      if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
+      const len = Math.sqrt(dx*dx + dy*dy);
+      if (len > 0) { dx /= len; dy /= len; }
+      this.vx = dx * this.speed; this.vy = dy * this.speed;
+      this.x += this.vx; this.y += this.vy;
+      this.x = clamp(this.x, 20, CW - 20);
+      this.y = clamp(this.y, 20, CH - 20);
+    }
+    draw() {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.fillStyle = '#fbbf24'; ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(0, -14);
+      ctx.lineTo(12, 10);
+      ctx.lineTo(-12, 10);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class Bobber {
+    constructor(x, y) {
+      this.x = x; this.y = y; this.targetX = x; this.targetY = y;
+      this.radius = 5; this.state = 'casting'; // casting, floating, hooked, reeling
+      this.phase = 0; this.biteTimer = 0; this.biteChance = 0;
+      this.fish = null; this.reelProgress = 0;
+      this.tension = 0;
+    }
+    update() {
+      this.phase += 0.1;
+      this.y = this.targetY + Math.sin(this.phase) * 3;
+      if (this.state === 'floating') {
+        this.biteChance += 0.002;
+        if (random(0, 1) < this.biteChance * 0.01) {
+          this.state = 'hooked';
+          this.biteTimer = 0;
+          this.fish = FISH_SPECIES[Math.floor(random(0, FISH_SPECIES.length))];
+          this.fish.weight = random(this.fish.weight * 0.7, this.fish.weight * 1.3);
+          this.fish.value = Math.floor(this.fish.value * (this.fish.weight / 3));
+          this.tension = 0;
+        }
+      } else if (this.state === 'hooked') {
+        this.biteTimer++;
+        this.x += (Math.sin(this.biteTimer * 0.2) * 2);
+        this.y += (Math.cos(this.biteTimer * 0.2) * 2);
+      } else if (this.state === 'reeling') {
+        this.y -= 4;
+        this.reelProgress += 1;
+        if (this.reelProgress > 300) {
+          this.state = 'caught';
+        }
+      } else if (this.state === 'caught') {
+        this.life = (this.life || 60) - 1;
+      }
+    }
+    draw() {
+      if (this.state === 'caught') return;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.fillStyle = this.state === 'hooked' ? '#f87171' : '#fbbf24';
+      ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  }
+
+  class Particle {
+    constructor(x, y, color) {
+      this.x = x; this.y = y; this.color = color;
+      const ang = random(0, Math.PI*2);
+      const sp = random(1, 5);
+      this.vx = Math.cos(ang) * sp; this.vy = Math.sin(ang) * sp;
+      this.life = random(20, 40); this.maxLife = this.life;
+      this.size = random(2, 5);
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vx *= 0.92; this.vy *= 0.92;
+      this.life--;
+    }
+    draw() {
+      const a = this.life / this.maxLife;
+      ctx.globalAlpha = a; ctx.fillStyle = this.color;
+      ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  let boat;
+  let bobber;
+  let particles = [];
+  let money = 0;
+  let day = 1;
+  let earnings = 0;
+  let gameRunning = false;
+  let gameOver = false;
+  let frameCount = 0;
+  let screenShake = 0;
+  let shopOpen = false;
+  let rodLevel = 1;
+  let lineLevel = 1;
+  let lureLevel = 1;
+  let boatLevel = 1;
+
+  const SHOP_ITEMS = [
+    { id: 'shopRod', name: 'Rod', cost: 100, desc: 'Better casting distance', max: 5, applied: () => { boat.speed += 0.5; } },
+    { id: 'shopLine', name: 'Line', cost: 150, desc: 'Stronger line for big fish', max: 5, applied: () => {} },
+    { id: 'shopLure', name: 'Lure', cost: 200, desc: 'Attracts rarer fish', max: 5, applied: () => {} },
+    { id: 'shopBoat', name: 'Boat', cost: 500, desc: 'Reach deeper waters', max: 3, applied: () => {} },
+  ];
+
+  function updateHUD() {
+    moneyDisplay.textContent = '$' + money;
+    dayDisplay.textContent = day;
+    biggestDisplay.textContent = biggestFish.toFixed(1) + ' lb';
+    earningsDisplay.textContent = '$' + totalEarnings;
+  }
+
+  function catchFish() {
+    if (!bobber || bobber.state !== 'hooked') return;
+    const f = bobber.fish;
+    money += f.value;
+    totalEarnings += f.value;
+    if (f.weight > biggestFish) {
+      biggestFish = f.weight;
+      biggestDisplay.textContent = biggestFish.toFixed(1) + ' lb';
+      try { localStorage.setItem('pixelFisherBiggest', String(biggestFish)); } catch (e) {}
+    }
+    createExplosion(bobber.x, bobber.y, f.color, 10, 20);
+    screenShake = 10;
+    bobber.state = 'caught';
+    bobber.life = 60;
+    updateHUD();
+  }
+
+  function createExplosion(x, y, color, count, speed) {
+    for (let i = 0; i < count; i++) particles.push(new Particle(x, y, color));
+  }
+
+  function openShop() {
+    shopOpen = true;
+    gameRunning = false;
+    shopPanel.classList.add('visible');
+    updateShopUI();
+  }
+
+  function closeShop() {
+    shopOpen = false;
+    shopPanel.classList.remove('visible');
+    gameRunning = true;
+    updateHUD();
+    requestAnimationFrame(loop);
+  }
+
+  function updateShopUI() {
+    const items = [
+      { el: document.getElementById('shopRod'), data: SHOP_ITEMS[0], level: rodLevel },
+      { el: document.getElementById('shopLine'), data: SHOP_ITEMS[1], level: lineLevel },
+      { el: document.getElementById('shopLure'), data: SHOP_ITEMS[2], level: lureLevel },
+      { el: document.getElementById('shopBoat'), data: SHOP_ITEMS[3], level: boatLevel },
+    ];
+    for (const { el, data, level } of items) {
+      const nextCost = data.cost * Math.pow(1.5, level - 1);
+      el.querySelector('h4').textContent = data.name + ' L' + level;
+      el.querySelector('.cost').textContent = '$' + Math.floor(nextCost);
+      el.querySelector('p').textContent = data.desc;
+      if (level >= data.max || money < nextCost) el.classList.add('disabled');
+      else el.classList.remove('disabled');
+      el.onclick = () => buyUpgrade(data);
+    }
+  }
+
+  function buyUpgrade(item) {
+    const nextCost = item.cost * Math.pow(1.5, (item.id === 'shopRod' ? rodLevel : item.id === 'shopLine' ? lineLevel : item.id === 'shopLure' ? lureLevel : boatLevel) - 1);
+    if (money < nextCost) return;
+    money -= nextCost;
+    if (item.id === 'shopRod') { rodLevel++; boat.speed += 0.5; }
+    else if (item.id === 'shopLine') lineLevel++;
+    else if (item.id === 'shopLure') lureLevel++;
+    else if (item.id === 'shopBoat') boatLevel++;
+    updateShopUI();
+    updateHUD();
+  }
+
+  function initGame() {
+    boat = new Boat();
+    bobber = null;
+    particles = [];
+    money = 500; day = 1; earnings = 0;
+    rodLevel = 1; lineLevel = 1; lureLevel = 1; boatLevel = 1;
+    gameRunning = true; gameOver = false; frameCount = 0; screenShake = 0; shopOpen = false;
+    shopPanel.classList.remove('visible');
+    updateHUD();
+  }
+
+  function startGame() {
+    startScreen.style.display = 'none';
+    gameOverScreen.classList.remove('visible');
+    initGame();
+    gameRunning = true;
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', startGame);
+
+  shopPanel.onclick = (e) => {
+    if (e.target.closest('.shop-item')) return;
+    closeShop();
+  };
+
+  function loop() {
+    if (!gameRunning || shopOpen) return;
+    frameCount++;
+
+    if (keys['KeyR'] && gameOver) { startGame(); keys['KeyR'] = false; return; }
+
+    boat.update();
+
+    // Fishing
+    if (mouse.justClicked && !bobber && !gameOver) {
+      bobber = new Bobber(boat.x, boat.y - 30);
+      bobber.state = 'floating';
+      screenShake = 4;
+    }
+    if (mouse.justClicked && bobber && bobber.state === 'hooked') {
+      bobber.state = 'reeling';
+      bobber.reelProgress = 0;
+    }
+    mouse.justClicked = false;
+
+    if (bobber) {
+      bobber.update();
+      if (bobber.state === 'caught') {
+        bobber.life--;
+        if (bobber.life <= 0) {
+          catchFish();
+          bobber = null;
+        }
+      } else if (bobber.y < -20) {
+        bobber = null;
+      }
+    }
+
+    // Day cycle
+    if (frameCount % 600 === 0) {
+      day++;
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    if (screenShake > 0) screenShake *= 0.9;
+
+    // Draw
+    ctx.save();
+    if (screenShake > 0) ctx.translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
+
+    // Sky / water gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, CH);
+    grad.addColorStop(0, '#0f172a');
+    grad.addColorStop(0.4, '#1e293b');
+    grad.addColorStop(1, '#0f172a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Water surface
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, CH * 0.55, CW, CH * 0.45);
+    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 1; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 8;
+    for (let i = 0; i < CW; i += 40) {
+      const y = CH * 0.55 + Math.sin(frameCount * 0.03 + i * 0.05) * 4;
+      ctx.beginPath(); ctx.moveTo(i, y); ctx.lineTo(i + 40, y + Math.sin(frameCount * 0.03 + (i + 40) * 0.05) * 4); ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+
+    // Boat
+    boat.draw();
+
+    // Bobber
+    if (bobber) bobber.draw();
+
+    // Particles
+    for (const p of particles) {
+      p.update();
+      if (p.life <= 0) continue;
+      const a = p.life / p.maxLife;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+    updateHUD();
+    requestAnimationFrame(loop);
+  }
+
+  function endGame() {
+    gameOver = true;
+    gameRunning = false;
+    finalScore.textContent = 'Total Earnings: $' + earnings;
+    finalBest.textContent = 'Biggest Fish: ' + biggestFish.toFixed(1) + ' lb';
+    gameOverScreen.classList.add('visible');
+    updateHUD();
+  }
+
+  startScreen.style.display = 'flex';
+  gameOverScreen.classList.remove('visible');
+  updateHUD();
+
+})();
+</script>
+</body>
+</html>
+HTMLEOF
+echo "PF_PART2_OK"
