@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRAIN TO NOWHERE</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #e2e8f0;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  canvas {
+    display: block; border: 2px solid #334155;
+    box-shadow: 0 0 60px rgba(245,158,11,0.15), inset 0 0 60px rgba(0,0,0,0.9);
+    background: linear-gradient(#1e1b4b, #0f172a); max-width: 100%; max-height: 90vh;
+    cursor: crosshair;
+  }
+  #hud {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 55px; pointer-events: none; z-index: 10;
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+  .hud-item { text-align: center; }
+  .hud-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+  .hud-value { font-size: 24px; font-weight: bold; text-shadow: 0 0 12px currentColor; }
+  .hud-value.locomotive { color: #f87171; }
+  .hud-value.distance { color: #fbbf24; }
+  .hud-value.ammo { color: #38bdf8; }
+  .hud-value.wave { color: #a78bfa; }
+  .hud-value.best { color: #34d399; }
+  #start-screen {
+    position: absolute; inset: 0; background: radial-gradient(circle, #1e1b4b 0%, #0a0a0f 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(8px);
+  }
+  .title { font-size: 56px; font-weight: bold; color: #fbbf24; letter-spacing: 10px;
+    margin-bottom: 10px; text-shadow: 0 0 30px rgba(251,191,36,0.8); }
+  .subtitle { font-size: 16px; color: #94a3b8; letter-spacing: 6px; margin-bottom: 40px;
+    text-shadow: 0 0 15px rgba(148,163,184,0.4); font-style: italic; }
+  .controls { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px;
+    max-width: 360px; margin-bottom: 40px; }
+  .control { padding: 10px 16px; border: 1px solid #334155; border-radius: 6px;
+    background: rgba(30,41,59,0.5); color: #cbd5e1; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px; }
+  .control kbd { color: #fbbf24; font-weight: bold; }
+  .press-start {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #fbbf24; background: transparent; border: 2px solid #fbbf24;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(251,191,36,0.4);
+  }
+  .press-start:hover { background: #fbbf24; color: #0a0a0f;
+    box-shadow: 0 0 35px rgba(251,191,36,0.9); }
+  #game-over {
+    position: absolute; inset: 0; background: rgba(10,10,15,0.94);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(10px);
+  }
+  #game-over.visible { display: flex; }
+  .game-title { font-size: 52px; font-weight: bold; color: #f87171; margin-bottom: 16px;
+    text-shadow: 0 0 25px rgba(248,113,113,0.8); }
+  .final-stats { font-size: 20px; color: #e2e8f0; margin-bottom: 8px; }
+  .press-r {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #a78bfa; background: transparent; border: 2px solid #a78bfa;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(167,139,250,0.4);
+  }
+  .press-r:hover { background: #a78bfa; color: #0a0a0f;
+    box-shadow: 0 0 35px rgba(167,139,250,0.9); }
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 30;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%,
+      rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.35)); background-size: 100% 4px;
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 31;
+    background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.9) 100%);
+  }
+</style>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <canvas id="gameCanvas" width="1000" height="700"></canvas>
+  <div id="hud">
+    <div class="hud-item"><div class="hud-label">locomotive</div><div class="hud-value locomotive" id="locomotiveDisplay">100</div></div>
+    <div class="hud-item"><div class="hud-label">distance</div><div class="hud-value distance" id="distanceDisplay">0 m</div></div>
+    <div class="hud-item"><div class="hud-label">ammo</div><div class="hud-value ammo" id="ammoDisplay">24</div></div>
+    <div class="hud-item"><div class="hud-label">wave</div><div class="hud-value wave" id="waveDisplay">1</div></div>
+    <div class="hud-item"><div class="hud-label">best</div><div class="hud-value best" id="bestDistanceDisplay">0 m</div></div>
+  </div>
+  <div id="start-screen">
+    <div class="title">TRAIN TO NOWHERE</div>
+    <div class="subtitle">Defend the train. Don't let it stop.</div>
+    <div class="controls">
+      <div class="control">Move <kbd>WASD</kbd></div>
+      <div class="control">Aim <kbd>MOUSE</kbd> / Fire <kbd>CLICK</kbd></div>
+      <div class="control">Repair <kbd>R</kbd> near engine</div>
+    </div>
+    <button class="press-start" id="startBtn">All Aboard</button>
+  </div>
+  <div id="game-over">
+    <div class="game-title">Train Stopped</div>
+    <div class="final-stats" id="finalScore">Distance: 0 m</div>
+    <div class="final-stats" id="finalBest">Best distance: 0 m</div>
+    <button class="press-r" id="restartBtn">Restart (R)</button>
+  </div>
+<script>
+(function(){
+  'use strict';
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+
+  const locomotiveDisplay = document.getElementById('locomotiveDisplay');
+  const distanceDisplay = document.getElementById('distanceDisplay');
+  const ammoDisplay = document.getElementById('ammoDisplay');
+  const waveDisplay = document.getElementById('waveDisplay');
+  const bestDistanceDisplay = document.getElementById('bestDistanceDisplay');
+  const startScreen = document.getElementById('start-screen');
+  const gameOverScreen = document.getElementById('game-over');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const finalScore = document.getElementById('finalScore');
+  const finalBest = document.getElementById('finalBest');
+
+  let bestDistance = 0;
+  try {
+    const s = localStorage.getItem('trainToNowhereBestDistance');
+    if (s !== null) bestDistance = parseInt(s, 10) || 0;
+  } catch (e) {}
+  bestDistanceDisplay.textContent = bestDistance + ' m';
+
+  const mouse = { x: CW/2, y: CH/2, down: false, justClicked: false };
+  window.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  window.addEventListener('mousedown', () => { mouse.down = true; mouse.justClicked = true; });
+  window.addEventListener('mouseup', () => { mouse.down = false; });
+  window.addEventListener('click', () => { mouse.justClicked = false; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  const keys = {};
+  window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+  function random(min, max) { return Math.random() * (max - min) + min; }
+  function dist(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function angleTo(tx, ty, sx, sy) { return Math.atan2(ty - sy, tx - sx); }
+
+  class Bullet {
+    constructor(x, y, angle, damage, speed, color) {
+      this.x = x; this.y = y; this.angle = angle;
+      this.damage = damage; this.speed = speed; this.color = color;
+      this.life = 50; this.radius = 3;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.life--;
+    }
+    draw() {
+      ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+  class Enemy {
+    constructor(wave) {
+      this.radius = 10 + wave * 0.7;
+      this.hp = 25 + wave * 12;
+      this.maxHp = this.hp;
+      this.speed = 1.8 + wave * 0.08;
+      this.damage = 12 + wave * 1.5;
+      this.dead = false;
+      this.hitFlash = 0;
+      this.type = 'normal';
+      const r = random(0, 1);
+      if (r < 0.2) { this.type = 'bike'; this.speed *= 1.7; this.hp *= 0.5; this.radius *= 0.8; }
+      else if (r < 0.35) { this.type = 'truck'; this.speed *= 0.6; this.hp *= 2.2; this.radius *= 1.4; }
+      else if (r < 0.45) { this.type = 'drone'; this.speed *= 2.2; this.radius *= 0.7; this.y = random(-50, 50); }
+      const side = Math.floor(random(0, 2));
+      if (side === 0) { this.x = random(-200, -40); this.y = random(40, CH - 40); }
+      else { this.x = random(CW + 40, CW + 200); this.y = random(40, CH - 40); }
+    }
+    update(trainX) {
+      if (this.dead) return;
+      if (this.hitFlash > 0) this.hitFlash--;
+      const ang = angleTo(trainX + CW/2, CH/2, this.x, this.y);
+      this.x += Math.cos(ang) * this.speed;
+      this.y += Math.sin(ang) * this.speed;
+      // Train collision
+      if (dist(this.x, this.y, trainX + CW/2, CH/2) < this.radius + 200) {
+        // Hit train
+      }
+    }
+    draw() {
+      if (this.dead) return;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.fillStyle = this.type === 'bike' ? '#f472b6' : this.type === 'truck' ? '#ef4444' : this.type === 'drone' ? '#38bdf8' : '#ef4444';
+      ctx.fillStyle = this.hitFlash > 0 ? '#fbbf24' : ctx.fillStyle;
+      ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(0, -this.radius);
+      ctx.lineTo(this.radius * 0.866, this.radius * 0.5);
+      ctx.lineTo(0, -this.radius * 0.2);
+      ctx.lineTo(-this.radius * 0.866, this.radius * 0.5);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  }
+  class Particle {
+    constructor(x, y, color) {
+      this.x = x; this.y = y; this.color = color;
+      const ang = random(0, Math.PI*2);
+      const sp = random(1, 6);
+      this.vx = Math.cos(ang) * sp; this.vy = Math.sin(ang) * sp;
+      this.life = random(20, 40); this.maxLife = this.life;
+      this.size = random(2, 5);
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vx *= 0.92; this.vy *= 0.92;
+      this.life--;
+    }
+    draw() {
+      const a = this.life / this.maxLife;
+      ctx.globalAlpha = a; ctx.fillStyle = this.color;
+      ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  let playerX = 0; // train position offset
+  let player;
+  let bullets = [];
+  let enemies = [];
+  let particles = [];
+  let explosions = [];
+  let ammoPickups = [];
+  let wave = 1;
+  let distance = 0;
+  let score = 0;
+  let locomotiveHp = 100;
+  let maxLocomotiveHp = 100;
+  let ammo = 24;
+  let maxAmmo = 60;
+  let gameRunning = false;
+  let gameOver = false;
+  let frameCount = 0;
+  let spawnTimer = 0;
+  let enemiesToSpawn = 0;
+  let waveActive = false;
+  let waveStartDelay = 60;
+  let screenShake = 0;
+  let shootCooldown = 0;
+
+  function updateHUD() {
+    locomotiveDisplay.textContent = Math.ceil(locomotiveHp);
+    distanceDisplay.textContent = Math.floor(distance) + ' m';
+    ammoDisplay.textContent = ammo;
+    waveDisplay.textContent = wave;
+    bestDistanceDisplay.textContent = bestDistance + ' m';
+  }
+
+  function addScore(amount) {
+    score += amount;
+  }
+
+  function createExplosion(x, y, color, count, speed) {
+    for (let i = 0; i < count; i++) particles.push({ x, y, color, vx: (random(0,1)-0.5)*speed*2, vy: (random(0,1)-0.5)*speed*2, life: random(15,30), size: random(2,5) });
+  }
+
+  function endGame() {
+    gameOver = true;
+    gameRunning = false;
+    finalScore.textContent = 'Distance: ' + Math.floor(distance) + ' m';
+    finalBest.textContent = 'Best distance: ' + bestDistance + ' m';
+    gameOverScreen.classList.add('visible');
+    updateHUD();
+  }
+
+  function initGame() {
+    player = { x: CW/2, y: CH/2, hp: 100, maxHp: 100, angle: 0, invulnerable: 0, dead: false, radius: 12 };
+    bullets = []; enemies = []; particles = []; explosions = []; ammoPickups = [];
+    wave = 1; distance = 0; score = 0; locomotiveHp = 100; ammo = 24;
+    gameOver = false; frameCount = 0; spawnTimer = 0;
+    enemiesToSpawn = 0; waveActive = false; waveStartDelay = 60; screenShake = 0;
+    playerX = 0;
+    updateHUD();
+    startWave(1);
+  }
+
+  function startWave(w) {
+    wave = w; waveActive = true;
+    enemiesToSpawn = 4 + w * 3;
+    spawnTimer = 0;
+    waveStartDelay = 0;
+    updateHUD();
+  }
+
+  function spawnEnemy() {
+    if (enemiesToSpawn <= 0) return;
+    enemies.push(new Enemy(wave));
+    enemiesToSpawn--;
+    spawnTimer = random(25, 60) / (1 + wave * 0.05);
+  }
+
+  function spawnAmmo() {
+    if (random(0, 1) < 0.15) ammoPickups.push({ x: random(40, CW - 40), y: random(40, CH - 40), radius: 8, life: 400 });
+  }
+
+  function startGame() {
+    startScreen.style.display = 'none';
+    gameOverScreen.classList.remove('visible');
+    initGame();
+    gameRunning = true;
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', startGame);
+
+  function loop() {
+    if (!gameRunning) return;
+    frameCount++;
+
+    if (keys['KeyR'] && gameOver) { startGame(); keys['KeyR'] = false; return; }
+
+    if (mouse.down && shootCooldown <= 0 && ammo > 0 && !player.dead) {
+      const angle = player.angle;
+      const bx = player.x + Math.cos(angle) * 16;
+      const by = player.y + Math.sin(angle) * 16;
+      bullets.push(new Bullet(bx, by, angle, 18, 14, '#fbbf24'));
+      ammo--;
+      shootCooldown = 14;
+      screenShake = 4;
+      createExplosion(bx, by, '#fbbf24', 2, 8);
+      updateHUD();
+    }
+    if (shootCooldown > 0) shootCooldown--;
+
+    // Train moves forward (scrolling world)
+    playerX += 3 + wave * 0.05;
+    distance += 3 + wave * 0.05;
+
+    // Player stays centered but can move within train cars
+    let dx = 0, dy = 0;
+    if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+    if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
+    if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+    if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len > 0) { dx /= len; dy /= len; }
+    player.x += dx * 4.0; player.y += dy * 4.0;
+    player.x = clamp(player.x, 120, CW - 120);
+    player.y = clamp(player.y, 120, CH - 120);
+    player.angle = angleTo(mouse.x, mouse.y, player.x, player.y);
+    if (player.invulnerable > 0) player.invulnerable--;
+
+    // Repair near engine
+    if (keys['KeyR'] && dist(player.x, player.y, CW/2 + 60, CH/2) < 80 && locomotiveHp < maxLocomotiveHp) {
+      locomotiveHp += 0.3;
+      if (locomotiveHp > maxLocomotiveHp) locomotiveHp = maxLocomotiveHp;
+      screenShake = 2;
+      updateHUD();
+    }
+
+    // Wave
+    if (waveStartDelay > 0) {
+      waveStartDelay--;
+      if (waveStartDelay <= 0) startWave(wave);
+    }
+
+    if (waveActive) {
+      if (enemiesToSpawn > 0 && spawnTimer <= 0) spawnEnemy();
+      if (spawnTimer > 0) spawnTimer--;
+      if (enemiesToSpawn <= 0 && enemies.length === 0) {
+        waveActive = false;
+        score += 100 + wave * 20;
+        updateHUD();
+        waveStartDelay = 160;
+        setTimeout(() => { if (gameRunning && !gameOver) startWave(wave + 1); }, 1700);
+      }
+    }
+
+    // Bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      bullets[i].update();
+      if (bullets[i].life <= 0 || bullets[i].x < 0 || bullets[i].x > CW || bullets[i].y < 0 || bullets[i].y > CH) {
+        bullets.splice(i, 1); continue;
+      }
+      for (let e = enemies.length - 1; e >= 0; e--) {
+        const en = enemies[e];
+        if (en.dead) continue;
+        if (dist(bullets[i].x, bullets[i].y, en.x, en.y) < en.radius + 3) {
+          en.hp -= bullets[i].damage;
+          en.hitFlash = 6;
+          bullets.splice(i, 1);
+          if (en.hp <= 0) {
+            en.dead = true;
+            score += 25 + wave * 3;
+            createExplosion(en.x, en.y, '#ef4444', 6, 18);
+            if (random(0, 1) < 0.2) ammoPickups.push({ x: en.x, y: en.y, radius: 8, life: 300 });
+            enemies.splice(e, 1);
+          }
+          break;
+        }
+      }
+    }
+
+    // Enemies
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      enemies[i].update(playerX);
+      // Enemy hits train
+      if (dist(enemies[i].x, enemies[i].y, CW/2 + 60, CH/2) < enemies[i].radius + 180) {
+        locomotiveHp -= 0.15;
+        enemies[i].x -= Math.cos(enemies[i].angle || 0) * 2;
+        enemies[i].y -= Math.sin(enemies[i].angle || 0) * 2;
+        if (locomotiveHp <= 0) {
+          locomotiveHp = 0;
+          endGame();
+          return;
+        }
+      }
+      // Enemy hits player
+      if (dist(enemies[i].x, enemies[i].y, player.x, player.y) < enemies[i].radius + player.radius && player.invulnerable <= 0) {
+        // Player damage handled by train damage mostly
+        enemies[i].dead = true;
+        createExplosion(enemies[i].x, enemies[i].y, '#ef4444', 5, 15);
+        screenShake = 8;
+      }
+    }
+
+    // Ammo pickups
+    for (let i = ammoPickups.length - 1; i >= 0; i--) {
+      const a = ammoPickups[i];
+      a.life--;
+      if (dist(player.x, player.y, a.x, a.y) < player.radius + a.radius) {
+        ammo = Math.min(maxAmmo, ammo + 8);
+        ammoPickups.splice(i, 1);
+        updateHUD();
+      } else if (a.life <= 0) {
+        ammoPickups.splice(i, 1);
+      }
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      const e = explosions[i];
+      e.x += e.vx; e.y += e.vy;
+      e.vx *= 0.9; e.vy *= 0.9;
+      e.life--;
+      if (e.life <= 0) explosions.splice(i, 1);
+    }
+
+    if (screenShake > 0) screenShake *= 0.9;
+
+    // Draw
+    ctx.save();
+    if (screenShake > 0) ctx.translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
+
+    // Scrolling background (countryside)
+    const scrollX = (playerX * 0.5) % 200;
+    ctx.fillStyle = '#1a2e1a';
+    ctx.fillRect(0, 0, CW, CH);
+    // Fields
+    ctx.fillStyle = '#2d4a2d';
+    ctx.fillRect(0, CH * 0.6, CW, CH * 0.4);
+    // Road/tracks
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, CH * 0.58, CW, 4);
+    ctx.fillRect(0, CH * 0.62, CW, 4);
+    // Scrolling trees
+    ctx.fillStyle = '#1b5e20';
+    for (let i = -1; i <= 6; i++) {
+      const tx = (i * 200 - scrollX + CW) % CW;
+      const ty = CH * 0.55 + random(-20, 20);
+      ctx.beginPath(); ctx.arc(tx, ty, 25, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#8b4513';
+      ctx.fillRect(tx - 4, ty + 25, 8, 20);
+      ctx.fillStyle = '#1b5e20';
+    }
+
+    // Train cars
+    ctx.fillStyle = '#4a4a4a'; ctx.strokeStyle = '#8b4513'; ctx.lineWidth = 3;
+    for (let i = -2; i <= 2; i++) {
+      const cx = CW/2 + (i * 220) - (playerX % 220);
+      if (cx > -220 && cx < CW + 220) {
+        ctx.fillRect(cx - 100, CH/2 - 40, 200, 80);
+        ctx.strokeRect(cx - 100, CH/2 - 40, 200, 80);
+        // Windows
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(cx - 70, CH/2 - 25, 20, 30);
+        ctx.fillRect(cx + 50, CH/2 - 25, 20, 30);
+        ctx.fillStyle = '#4a4a4a';
+      }
+    }
+    // Locomotive (front)
+    ctx.fillStyle = '#d97706'; ctx.shadowColor = '#d97706'; ctx.shadowBlur = 15;
+    ctx.fillRect(CW/2 + 60 - 30, CH/2 - 35, 60, 70);
+    ctx.strokeStyle = '#b45309'; ctx.lineWidth = 3; ctx.strokeRect(CW/2 + 60 - 30, CH/2 - 35, 60, 70);
+    ctx.shadowBlur = 0;
+    // Locomotive hp bar
+    const bw = 60, bh = 6;
+    ctx.fillStyle = '#1a1a1a'; ctx.fillRect(CW/2 + 60 - bw/2, CH/2 - 50, bw, bh);
+    ctx.fillStyle = locomotiveHp > 30 ? '#10b981' : '#f87171';
+    ctx.fillRect(CW/2 + 60 - bw/2, CH/2 - 50, bw * (locomotiveHp / maxLocomotiveHp), bh);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.strokeRect(CW/2 + 60 - bw/2, CH/2 - 50, bw, bh);
+
+    // Enemy smoke
+    for (const e of enemies) e.draw();
+
+    // Bullets
+    for (const b of bullets) b.draw();
+
+    // Enemies (draw over bullets)
+    for (const e of enemies) e.draw();
+
+    // Ammo pickups
+    ctx.fillStyle = '#fbbf24'; ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 10;
+    for (const a of ammoPickups) {
+      ctx.beginPath(); ctx.arc(a.x, a.y, a.radius, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
+    // Particles
+    for (const p of particles) p.draw();
+
+    // Explosions
+    for (const e of explosions) {
+      ctx.globalAlpha = e.life / 30;
+      ctx.strokeStyle = e.color; ctx.lineWidth = 2; ctx.shadowColor = e.color; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.size * (30 - e.life)/10, 0, Math.PI*2); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+
+    // Player
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+    const flash = player.invulnerable > 0 && frameCount % 6 < 3;
+    if (flash) ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#fbbf24'; ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.moveTo(0, -player.radius);
+    ctx.lineTo(player.radius * 0.866, player.radius * 0.5);
+    ctx.lineTo(0, -player.radius * 0.2);
+    ctx.lineTo(-player.radius * 0.866, player.radius * 0.5);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    ctx.restore();
+    updateHUD();
+    requestAnimationFrame(loop);
+  }
+
+  function endGame() {
+    gameOver = true;
+    gameRunning = false;
+    const d = Math.floor(distance);
+    if (d > bestDistance) {
+      bestDistance = d;
+      try { localStorage.setItem('trainToNowhereBestDistance', String(bestDistance)); } catch (e) {}
+    }
+    finalScore.textContent = 'Distance: ' + d + ' m';
+    finalBest.textContent = 'Best distance: ' + bestDistance + ' m';
+    gameOverScreen.classList.add('visible');
+    updateHUD();
+  }
+
+  startScreen.style.display = 'flex';
+  gameOverScreen.classList.remove('visible');
+  updateHUD();
+
+})();
+</script>
+</body>
+</html>
+HTMLEOF
+echo "TTN_PART2_OK"
