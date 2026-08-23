@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIGHT SHIFT</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #050505; color: #e2e8f0;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  canvas {
+    display: block; border: 2px solid #334155;
+    box-shadow: 0 0 60px rgba(248,113,113,0.1), inset 0 0 80px rgba(0,0,0,1);
+    background: #020204; max-width: 100%; max-height: 90vh;
+    cursor: crosshair;
+  }
+  #hud {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 55px; pointer-events: none; z-index: 10;
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+  .hud-item { text-align: center; }
+  .hud-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+  .hud-value { font-size: 24px; font-weight: bold; text-shadow: 0 0 12px currentColor; }
+  .hud-value.power { color: #fbbf24; }
+  .hud-value.time { color: #38bdf8; }
+  .hud-value.night { color: #a78bfa; }
+  .hud-value.best { color: #34d399; }
+  #control-panel {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 14px; z-index: 10;
+    background: rgba(5,5,5,0.9); padding: 14px 20px;
+    border-radius: 10px; border: 1px solid #334155;
+    backdrop-filter: blur(8px);
+  }
+  .ctrl-btn {
+    width: 64px; height: 64px; border-radius: 8px;
+    border: 2px solid #334155; cursor: pointer;
+    background: rgba(30,41,59,0.8); color: #e2e8f0;
+    font-size: 20px; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; transition: all 0.15s;
+  }
+  .ctrl-btn.active { border-color: #f87171; background: rgba(248,113,113,0.2); }
+  .ctrl-btn.off { opacity: 0.4; }
+  .ctrl-btn .label { font-size: 10px; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+  #start-screen {
+    position: absolute; inset: 0; background: radial-gradient(circle, #1a1a1a 0%, #050505 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(8px);
+  }
+  .title { font-size: 60px; font-weight: bold; color: #f87171; letter-spacing: 12px;
+    margin-bottom: 10px; text-shadow: 0 0 30px rgba(248,113,113,0.8); }
+  .subtitle { font-size: 15px; color: #94a3b8; letter-spacing: 8px; margin-bottom: 40px;
+    text-shadow: 0 0 15px rgba(148,163,184,0.4); font-style: italic; }
+  .controls { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px;
+    max-width: 360px; margin-bottom: 40px; }
+  .control { padding: 10px 16px; border: 1px solid #334155; border-radius: 6px;
+    background: rgba(30,41,59,0.5); color: #cbd5e1; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px; }
+  .control kbd { color: #f87171; font-weight: bold; }
+  .press-start {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #f87171; background: transparent; border: 2px solid #f87171;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(248,113,113,0.4);
+  }
+  .press-start:hover { background: #f87171; color: #050505;
+    box-shadow: 0 0 35px rgba(248,113,113,0.9); }
+  #game-over {
+    position: absolute; inset: 0; background: rgba(5,5,5,0.95);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20; text-align: center; backdrop-filter: blur(10px);
+  }
+  #game-over.visible { display: flex; }
+  .game-title { font-size: 52px; font-weight: bold; color: #f87171; margin-bottom: 16px;
+    text-shadow: 0 0 25px rgba(248,113,113,0.8); }
+  .final-stats { font-size: 20px; color: #e2e8f0; margin-bottom: 8px; }
+  .press-r {
+    padding: 14px 42px; font-size: 20px; font-family: inherit; font-weight: bold;
+    color: #38bdf8; background: transparent; border: 2px solid #38bdf8;
+    border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    letter-spacing: 4px; transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(56,189,248,0.4);
+  }
+  .press-r:hover { background: #38bdf8; color: #050505;
+    box-shadow: 0 0 35px rgba(56,189,248,0.9); }
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 30;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%,
+      rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.4)); background-size: 100% 4px;
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 31;
+    background: radial-gradient(circle at center, transparent 35%, rgba(0,0,0,0.95) 100%);
+  }
+  .jumpscare {
+    position: absolute; inset: 0; background: #000;
+    display: none; z-index: 50; align-items: center; justify-content: center;
+  }
+</style>
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  <canvas id="gameCanvas" width="1000" height="700"></canvas>
+  <div id="hud">
+    <div class="hud-item"><div class="hud-label">power</div><div class="hud-value power" id="powerDisplay">100</div></div>
+    <div class="hud-item"><div class="hud-label">time</div><div class="hud-value time" id="timeDisplay">12:00 AM</div></div>
+    <div class="hud-item"><div class="hud-label">night</div><div class="hud-value night" id="nightDisplay">1</div></div>
+    <div class="hud-item"><div class="hud-label">best</div><div class="hud-value best" id="bestNightDisplay">0</div></div>
+  </div>
+  <div id="control-panel">
+    <div class="ctrl-btn" id="btnDoor1" title="Door 1">🚪<div class="label">Door 1</div></div>
+    <div class="ctrl-btn" id="door1Light" title="Light 1">💡<div class="label">Light 1</div></div>
+    <div class="ctrl-btn" id="btnDoor2" title="Door 2">🚪<div class="label">Door 2</div></div>
+    <div class="ctrl-btn" id="door2Light" title="Light 2">💡<div class="label">Light 2</div></div>
+    <div class="ctrl-btn" id="btnCam" title="Cameras">📹<div class="label">Cameras</div></div>
+    <div class="ctrl-btn" id="btnLight" title="Office Light">💡<div class="label">Office Light</div></div>
+  </div>
+  <div id="start-screen">
+    <div class="title">NIGHT SHIFT</div>
+    <div class="subtitle">Survive until 6 AM. Don't look away.</div>
+    <div class="controls">
+      <div class="control">Doors <kbd>CLICK</kbd></div>
+      <div class="control">Lights <kbd>CLICK</kbd></div>
+      <div class="control">Cameras <kbd>CLICK</kbd></div>
+    </div>
+    <button class="press-start" id="startBtn">Start Shift</button>
+  </div>
+  <div id="game-over">
+    <div class="game-title">They Got In</div>
+    <div class="final-stats" id="finalScore">Night: 0</div>
+    <div class="final-stats" id="finalBest">Best night: 0</div>
+    <button class="press-r" id="restartBtn">Restart (R)</button>
+  </div>
+  <div id="jumpscare" class="jumpscare">
+    <div style="font-size: 120px; color: #f87171; filter: blur(2px);">😱</div>
+    <div style="position:absolute; bottom:20px; color:#f87171; font-weight:bold; letter-spacing:4px;">THEY FOUND YOU</div>
+  </div>
+<script>
+(function(){
+  'use strict';
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+
+  const powerDisplay = document.getElementById('powerDisplay');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const nightDisplay = document.getElementById('nightDisplay');
+  const bestNightDisplay = document.getElementById('bestNightDisplay');
+  const startScreen = document.getElementById('start-screen');
+  const gameOverScreen = document.getElementById('game-over');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const finalScore = document.getElementById('finalScore');
+  const finalBest = document.getElementById('finalBest');
+  const jumpscare = document.getElementById('jumpscare');
+
+  let bestNight = 0;
+  try {
+    const s = localStorage.getItem('nightShiftBestNight');
+    if (s !== null) bestNight = parseInt(s, 10) || 0;
+  } catch (e) {}
+  bestNightDisplay.textContent = bestNight;
+
+  const keys = {};
+  window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+  function random(min, max) { return Math.random() * (max - min) + min; }
+  function dist(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  const ROOMS = [
+    { name: 'Office', x: CW/2, y: CH/2, w: 340, h: 220 },
+    { name: 'Hall A', x: 120, y: 180, w: 150, h: 90 },
+    { name: 'Hall B', x: 730, y: 180, w: 150, h: 90 },
+    { name: 'Kitchen', x: 180, y: 460, w: 160, h: 100 },
+    { name: 'Vent A', x: 820, y: 460, w: 140, h: 100 },
+  ];
+
+  class Creature {
+    constructor(night) {
+      this.roomIndex = random(0, ROOMS.length - 1) | 0;
+      this.x = ROOMS[this.roomIndex].x + ROOMS[this.roomIndex].w / 2;
+      this.y = ROOMS[this.roomIndex].y + ROOMS[this.roomIndex].h / 2;
+      this.radius = 12;
+      this.hp = 1;
+      this.speed = 1.0 + night * 0.08;
+      this.damage = 1;
+      this.dead = false;
+      this.hitFlash = 0;
+      this.atOffice = false;
+      this.aggression = 0.5 + night * 0.1;
+    }
+    update(officeLights, doorsClosed, officeDoorClosed) {
+      if (this.dead) return;
+      const room = ROOMS[this.roomIndex];
+      // Random wander
+      if (frameCount % 60 === 0) {
+        this.roomIndex = (this.roomIndex + Math.floor(random(0, ROOMS.length))) % ROOMS.length;
+      }
+      const target = ROOMS[this.roomIndex];
+      const ang = angleTo(target.x + target.w/2, target.y + target.h/2, this.x, this.y);
+      this.x += Math.cos(ang) * this.speed;
+      this.y += Math.sin(ang) * this.speed;
+      // Check if at office
+      if (this.roomIndex === 0 && dist(this.x, this.y, CW/2, CH/2) < 60) {
+        this.atOffice = true;
+        // Attack if office door open and light off
+        if (!doorsClosed && !officeLights) {
+          return true; // jumpscare
+        }
+      }
+      return false;
+    }
+    draw() {
+      if (this.dead) return;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.fillStyle = this.hitFlash > 0 ? '#fbbf24' : '#f87171';
+      ctx.shadowColor = '#f87171'; ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(0, -this.radius);
+      ctx.lineTo(this.radius * 0.866, this.radius * 0.5);
+      ctx.lineTo(0, -this.radius * 0.2);
+      ctx.lineTo(-this.radius * 0.866, this.radius * 0.5);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  }
+
+  class Particle {
+    constructor(x, y, color) {
+      this.x = x; this.y = y; this.color = color;
+      const ang = random(0, Math.PI*2);
+      const sp = random(1, 5);
+      this.vx = Math.cos(ang) * sp; this.vy = Math.sin(ang) * sp;
+      this.life = random(20, 40); this.maxLife = this.life;
+      this.size = random(2, 5);
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vx *= 0.92; this.vy *= 0.92;
+      this.life--;
+    }
+    draw() {
+      const a = this.life / this.maxLife;
+      ctx.globalAlpha = a; ctx.fillStyle = this.color;
+      ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function angleTo(tx, ty, sx, sy) { return Math.atan2(ty - sy, tx - sx); }
+  function dist(x1, y1, x2, y2) { const dx = x2 - x1, dy = y2 - y1; return Math.sqrt(dx*dx + dy*dy); }
+  function random(min, max) { return Math.random() * (max - min) + min; }
+
+  let creatures = [];
+  let particles = [];
+  let night = 1;
+  let timeMin = 12; // 12 AM start
+  let power = 100;
+  let maxPower = 100;
+  let gameRunning = false;
+  let gameOver = false;
+  let frameCount = 0;
+  let screenShake = 0;
+  let door1Open = false;
+  let door2Open = false;
+  let light1On = false;
+  let light2On = false;
+  let officeLightOn = true;
+  let camView = false;
+  let jumpscareTimer = 0;
+  let powerDrainRate = 0.15;
+
+  function updateHUD() {
+    powerDisplay.textContent = Math.ceil(power);
+    const h = Math.floor(timeMin);
+    const m = Math.floor((timeMin % 1) * 60);
+    const ampm = h >= 12 ? ' PM' : ' AM';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    timeDisplay.textContent = h12 + ':' + (m < 10 ? '0' : '') + m + ampm;
+    nightDisplay.textContent = night;
+    bestNightDisplay.textContent = bestNight;
+  }
+
+  function initGame() {
+    creatures = []; particles = [];
+    night = 1; timeMin = 0; power = 100;
+    door1Open = false; door2Open = false; light1On = false; light2On = false; officeLightOn = true;
+    camView = false;
+    gameOver = false; frameCount = 0; screenShake = 0; jumpscareTimer = 0;
+    creatures.push(new Creature(1));
+    updateHUD();
+  }
+
+  function startGame() {
+    startScreen.style.display = 'none';
+    gameOverScreen.classList.remove('visible');
+    initGame();
+    gameRunning = true;
+    requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', startGame);
+
+  // Control buttons
+  const btnDoor1 = document.getElementById('btnDoor1');
+  const door1Light = document.getElementById('door1Light');
+  const btnDoor2 = document.getElementById('btnDoor2');
+  const door2Light = document.getElementById('door2Light');
+  const btnCam = document.getElementById('btnCam');
+  const btnLight = document.getElementById('btnLight');
+
+  btnDoor1.onclick = () => { door1Open = !door1Open; btnDoor1.classList.toggle('active', door1Open); };
+  door1Light.onclick = () => { light1On = !light1On; door1Light.classList.toggle('active', light1On); };
+  btnDoor2.onclick = () => { door2Open = !door2Open; btnDoor2.classList.toggle('active', door2Open); };
+  door2Light.onclick = () => { light2On = !light2On; door2Light.classList.toggle('active', light2On); };
+  btnCam.onclick = () => { camView = !camView; btnCam.classList.toggle('active', camView); };
+  btnLight.onclick = () => { officeLightOn = !officeLightOn; btnLight.classList.toggle('active', officeLightOn); };
+
+  function loop() {
+    if (!gameRunning) return;
+    frameCount++;
+
+    if (keys['KeyR'] && gameOver) { startGame(); keys['KeyR'] = false; return; }
+
+    // Time progression
+    timeMin += 0.003 + night * 0.0005;
+    if (timeMin >= 6) {
+      // Survived the night
+      night++;
+      timeMin = 0;
+      power = 100;
+      door1Open = false; door2Open = false; light1On = false; light2On = false; officeLightOn = true;
+      btnDoor1.classList.remove('active'); door1Light.classList.remove('active');
+      btnDoor2.classList.remove('active'); door2Light.classList.remove('active');
+      btnCam.classList.remove('active'); btnLight.classList.remove('active');
+      creatures = [];
+      for (let i = 0; i < night; i++) creatures.push(new Creature(night));
+      updateHUD();
+      if (night > bestNight) {
+        bestNight = night;
+        try { localStorage.setItem('nightShiftBestNight', String(bestNight)); } catch (e) {}
+      }
+    }
+
+    // Power drain
+    let drain = powerDrainRate;
+    if (officeLightOn) drain += 0.08;
+    if (door1Open) drain += 0.12;
+    if (door2Open) drain += 0.12;
+    if (light1On) drain += 0.06;
+    if (light2On) drain += 0.06;
+    if (camView) drain += 0.10;
+    power -= drain;
+    if (power < 0) power = 0;
+    if (power === 0) {
+      officeLightOn = false;
+      btnLight.classList.remove('active');
+    }
+
+    // Creature AI
+    let jumpscare = false;
+    for (const c of creatures) {
+      if (c.update(officeLightOn, door1Open || door2Open, door1Open && door2Open)) {
+        jumpscare = true;
+      }
+    }
+    if (jumpscare && jumpscareTimer <= 0) {
+      jumpscareTimer = 120;
+      jumpscare.style.display = 'flex';
+      screenShake = 25;
+      setTimeout(() => {
+        jumpscare.style.display = 'none';
+        endGame();
+      }, 1500);
+      return;
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].update();
+      if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    if (screenShake > 0) screenShake *= 0.9;
+
+    // Draw
+    ctx.save();
+    if (screenShake > 0) ctx.translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
+
+    const dark = isNight() ? 0.05 : 0.15;
+    ctx.fillStyle = 'rgba(5,5,8,' + dark + ')';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Office
+    const office = ROOMS[0];
+    ctx.fillStyle = officeLightOn && power > 0 ? '#2a2a2a' : '#0a0a0a';
+    ctx.fillRect(office.x, office.y, office.w, office.h);
+    ctx.strokeStyle = officeLightOn && power > 0 ? '#4a4a4a' : '#1a1a1a';
+    ctx.lineWidth = 3; ctx.strokeRect(office.x, office.y, office.w, office.h);
+
+    // Doors
+    ctx.fillStyle = door1Open ? '#1a1a1a' : '#4a4a4a';
+    ctx.fillRect(office.x - 40, office.y + 40, 40, 60);
+    ctx.fillStyle = door2Open ? '#1a1a1a' : '#4a4a4a';
+    ctx.fillRect(office.x + office.w, office.y + 40, 40, 60);
+
+    // Other rooms
+    for (let i = 1; i < ROOMS.length; i++) {
+      const r = ROOMS[i];
+      const lit = (i === 1 && light1On) || (i === 2 && light2On);
+      ctx.fillStyle = lit ? '#2a2a2a' : '#0a0a0a';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 2; ctx.strokeRect(r.x, r.y, r.w, r.h);
+    }
+
+    // Creatures
+    for (const c of creatures) c.draw();
+
+    // Particles
+    for (const p of particles) {
+      p.update();
+      if (p.life <= 0) continue;
+      const a = p.life / p.maxLife;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+      ctx.globalAlpha = 1;
+    }
+
+    // Camera view overlay
+    if (camView) {
+      ctx.fillStyle = 'rgba(0,20,0,0.85)';
+      ctx.fillRect(0, 0, CW, CH);
+      ctx.strokeStyle = '#0a0'; ctx.lineWidth = 4;
+      ctx.strokeRect(20, 20, CW - 40, CH - 40);
+      ctx.fillStyle = '#0f0'; ctx.font = '14px Courier New';
+      ctx.fillText('CAMERA FEED - NIGHT VISION', 30, 40);
+      for (const c of creatures) {
+        ctx.fillStyle = '#f00';
+        ctx.beginPath(); ctx.arc(c.x, c.y, 6, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    ctx.restore();
+    updateHUD();
+    requestAnimationFrame(loop);
+  }
+
+  function isNight() { return timeMin >= 0 && timeMin < 6; }
+
+  function createExplosion(x, y, color, count, speed) {
+    for (let i = 0; i < count; i++) particles.push(new Particle(x, y, color));
+  }
+
+  function endGame() {
+    gameOver = true;
+    gameRunning = false;
+    finalScore.textContent = 'Night: ' + night;
+    finalBest.textContent = 'Best night: ' + bestNight;
+    if (night > bestNight) {
+      bestNight = night;
+      try { localStorage.setItem('nightShiftBestNight', String(bestNight)); } catch (e) {}
+    }
+    gameOverScreen.classList.add('visible');
+    updateHUD();
+  }
+
+  startScreen.style.display = 'flex';
+  gameOverScreen.classList.remove('visible');
+  updateHUD();
+
+})();
+</script>
+</body>
+</html>
+HTMLEOF
+echo "NS_PART2_OK"
