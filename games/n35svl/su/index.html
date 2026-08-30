@@ -207,10 +207,10 @@
       this.x += Math.cos(ang) * this.speed;
       this.y += Math.sin(ang) * this.speed;
       if (dist(this.x, this.y, player.x, player.y) < this.radius + player.radius && player.invulnerable <= 0) {
-        player.hull -= this.damage;
+        hull -= this.damage;
         player.invulnerable = 60;
         screenShake = 8;
-        if (player.hull <= 0) player.dead = true;
+        if (hull <= 0) player.dead = true;
       }
     }
     draw() {
@@ -349,6 +349,11 @@
     enemiesToSpawn = 4 + r * 3;
     spawnTimer = 0;
     regionStartDelay = 0;
+    torpedoesLeft = Math.min(14, 8 + Math.floor(r / 2));
+    if (r > 1) {
+      hull = Math.min(maxHull, hull + 20);
+      oxygen = Math.min(maxOxygen, oxygen + 30);
+    }
     updateHUD();
   }
 
@@ -470,7 +475,10 @@
     for (let i = salvages.length - 1; i >= 0; i--) {
       salvages[i].update();
       if (dist(salvages[i].x, salvages[i].y, player.x, player.y) < player.radius + salvages[i].radius) {
+        torpedoesLeft = Math.min(14, torpedoesLeft + 2);
+        oxygen = Math.min(maxOxygen, oxygen + 15);
         addScore(salvages[i].value);
+        screenShake = 3;
         salvages.splice(i, 1);
       } else if (salvages[i].life <= 0) {
         salvages.splice(i, 1);
@@ -501,7 +509,8 @@
       e.x += e.vx; e.y += e.vy;
       e.vx *= 0.9; e.vy *= 0.9;
       e.life--;
-      if (e.life <= 0) explosions.splice(i, 1);
+      if (!e) continue;
+    if (e.life <= 0) explosions.splice(i, 1);
     }
     // Bubbles rise
     for (const b of bubbles) {
@@ -610,5 +619,3 @@
 </script>
 </body>
 </html>
-HTMLEOF
-echo "SU_PART2_OK"
