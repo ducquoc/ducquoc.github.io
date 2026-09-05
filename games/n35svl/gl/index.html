@@ -334,6 +334,7 @@
   let exit = null;
   let gravityWells = [];
   let particles = [];
+  let explosions = [];
   let level = 1;
   let score = 0;
   let gameRunning = false;
@@ -344,6 +345,7 @@
   let gravityWellCooldown = 0;
 
   function updateHUD() {
+    if (!player) return;
     energyDisplay.textContent = Math.ceil(player.energy);
     levelDisplay.textContent = level;
     timerDisplay.textContent = formatTime(Date.now() - levelStartTime);
@@ -530,6 +532,7 @@
     // Player death
     if (player.dead) {
       loadLevel(level);
+      requestAnimationFrame(loop);
       return;
     }
 
@@ -584,5 +587,3 @@
 </script>
 </body>
 </html>
-HTMLEOF
-echo "GL_PART2_OK"
