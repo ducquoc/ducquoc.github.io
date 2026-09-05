@@ -260,10 +260,10 @@
       this.x += Math.cos(ang) * this.speed;
       this.y += Math.sin(ang) * this.speed;
       if (dist(this.x, this.y, player.x, player.y) < this.radius + player.radius && player.invulnerable <= 0) {
-        player.hp -= this.damage;
+        hp -= this.damage;
         player.invulnerable = 30;
         screenShake = 6;
-        if (player.hp <= 0) player.dead = true;
+        if (hp <= 0) player.dead = true;
       }
     }
     draw() {
@@ -369,15 +369,15 @@
     gameRunning = false;
     const opts = [];
     const used = new Set();
-    while (opts.length < 3 && used.size < WEAPONS.length + 4) {
-      const idx = Math.floor(random(0, WEAPONS.length + 4));
+    while (opts.length < 3 && used.size < Object.keys(WEAPONS).length + 4) {
+      const idx = Math.floor(random(0, Object.keys(WEAPONS).length + 4));
       if (used.has(idx)) continue;
       used.add(idx);
-      if (idx < WEAPONS.length) {
+      if (idx < Object.keys(WEAPONS).length) {
         const key = Object.keys(WEAPONS)[idx];
         opts.push({ type: 'weapon', key, w: WEAPONS[key] });
       } else {
-        opts.push({ type: 'stat', kind: idx - WEAPONS.length });
+        opts.push({ type: 'stat', kind: idx - Object.keys(WEAPONS).length });
       }
     }
     const statNames = ['hp', 'speed', 'damage', 'firerate'];
@@ -634,5 +634,3 @@
 </script>
 </body>
 </html>
-HTMLEOF
-echo "CS_PART2_OK"
