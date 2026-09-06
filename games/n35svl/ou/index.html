@@ -384,6 +384,7 @@
   let reloadTimer = 0;
 
   function updateHUD() {
+    if (!player) return;
     hpDisplay.textContent = Math.ceil(player.hp);
     ammoDisplay.textContent = ammoInMag + '/' + ammoReserve;
     roundDisplay.textContent = round;
@@ -753,5 +754,3 @@
 </script>
 </body>
 </html>
-HTMLEOF
-echo "OU_PART2_OK"
