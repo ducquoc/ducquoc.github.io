@@ -284,7 +284,7 @@
   }
 
   function createExplosion(x, y, color, count, speed) {
-    for (let i = 0; i < count; i++) particles.push({ x, y, color, vx: (random(0,1)-0.5)*speed*2, vy: (random(0,1)-0.5)*speed*2, life: random(15,30), size: random(2,5) });
+    for (let i = 0; i < count; i++) particles.push(new Particle(x, y, color));
   }
 
   function endGame() {
@@ -598,5 +598,3 @@
 </script>
 </body>
 </html>
-HTMLEOF
-echo "TTN_PART2_OK"
