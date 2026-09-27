@@ -323,8 +323,11 @@
   let dodgeCooldown = 0;
   let dodgeTimer = 0;
   let dodging = false;
+  let ammo = 6;
+  let maxAmmo = 12;
 
   function updateHUD() {
+    if (!player) return;
     hpDisplay.textContent = Math.ceil(player.hp);
     ammoDisplay.textContent = ammo;
     bountyDisplay.textContent = '$' + bounty;
@@ -468,6 +471,7 @@
       if (bullets[i].life <= 0 || bullets[i].x < 0 || bullets[i].x > CW || bullets[i].y < 0 || bullets[i].y > CH) {
         bullets.splice(i, 1); continue;
       }
+      let hitBandit = false;
       for (let e = bandits.length - 1; e >= 0; e--) {
         const b = bandits[e];
         if (b.dead) continue;
@@ -475,6 +479,7 @@
           b.hp -= bullets[i].damage;
           b.hitFlash = 6;
           bullets.splice(i, 1);
+          hitBandit = true;
           if (b.hp <= 0) {
             b.dead = true;
             addBounty(b.bounty);
@@ -484,6 +489,7 @@
           break;
         }
       }
+      if (hitBandit) continue;
       for (let e = wanteds.length - 1; e >= 0; e--) {
         const w = wanteds[e];
         if (w.dead) continue;
@@ -635,5 +641,3 @@
 </script>
 </body>
 </html>
-HTMLEOF
-echo "BH_PART2_OK"
