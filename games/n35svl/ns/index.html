@@ -373,13 +373,13 @@
     }
 
     // Creature AI
-    let jumpscare = false;
+    let shouldJumpscare = false;
     for (const c of creatures) {
       if (c.update(officeLightOn, door1Open || door2Open, door1Open && door2Open)) {
-        jumpscare = true;
+        shouldJumpscare = true;
       }
     }
-    if (jumpscare && jumpscareTimer <= 0) {
+    if (shouldJumpscare && jumpscareTimer <= 0) {
       jumpscareTimer = 120;
       jumpscare.style.display = 'flex';
       screenShake = 25;
@@ -488,5 +488,3 @@
 </script>
 </body>
 </html>
-HTMLEOF
-echo "NS_PART2_OK"
